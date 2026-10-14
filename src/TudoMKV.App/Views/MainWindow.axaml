@@ -1,0 +1,118 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TudoMKV.App.ViewModels"
+        x:Class="TudoMKV.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="TudoMKV"
+        Width="1100" Height="720" MinWidth="800" MinHeight="500"
+        DragDrop.AllowDrop="True">
+
+  <DockPanel Margin="12">
+
+    <!-- Barra de ações -->
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+      <Button Content="Adicionar arquivos…" Click="OnAddFilesClick" />
+      <Button Content="Remover" Command="{Binding RemoveSourceCommand}" />
+      <Separator Width="16" Background="Transparent" />
+      <TextBlock Text="Saída:" VerticalAlignment="Center" />
+      <TextBox Text="{Binding OutputDirectory}" Width="320"
+               PlaceholderText="Mesma pasta do arquivo de origem" />
+      <Button Content="Escolher…" Click="OnChooseOutputClick" />
+      <Separator Width="16" Background="Transparent" />
+      <Button Content="Gravar selecionado" Classes="accent" Command="{Binding EnqueueSelectedCommand}" />
+      <Button Content="Gravar todos" Command="{Binding EnqueueAllCommand}" />
+    </StackPanel>
+
+    <!-- Fila e log -->
+    <Grid DockPanel.Dock="Bottom" Height="200" ColumnDefinitions="*,12,*" Margin="0,12,0,0">
+      <DockPanel>
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+          <Button DockPanel.Dock="Right" Content="Limpar concluídos" Command="{Binding ClearFinishedCommand}" />
+          <TextBlock Text="Fila" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </DockPanel>
+        <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" CornerRadius="4">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Jobs}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:JobViewModel">
+                  <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="8,6">
+                    <TextBlock Text="{Binding Name}" ToolTip.Tip="{Binding OutputPath}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Row="1" Text="{Binding StatusText}" FontSize="12" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Grid.Column="1" Grid.RowSpan="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <ProgressBar Value="{Binding Percent}" Width="160" ShowProgressText="True" />
+                      <Button Content="Cancelar" Command="{Binding CancelCommand}" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+      </DockPanel>
+
+      <DockPanel Grid.Column="2">
+        <TextBlock DockPanel.Dock="Top" Text="Log" FontWeight="SemiBold" Margin="0,0,0,4" Height="32" VerticalAlignment="Center" Padding="0,6,0,0" />
+        <ListBox ItemsSource="{Binding Log}" FontFamily="Consolas,Menlo,monospace" FontSize="12">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <SelectableTextBlock Text="{Binding}" TextWrapping="Wrap" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Grid>
+
+    <!-- Origens e faixas -->
+    <Grid ColumnDefinitions="300,12,*">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Arquivos" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <Panel>
+          <ListBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SourceViewModel">
+                <StackPanel>
+                  <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Details}" FontSize="12" Opacity="0.7" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Text="Arraste arquivos de vídeo para cá"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6"
+                     IsVisible="{Binding !Sources.Count}" />
+          <ProgressBar IsIndeterminate="True" VerticalAlignment="Bottom" IsVisible="{Binding IsBusy}" />
+        </Panel>
+      </DockPanel>
+
+      <DockPanel Grid.Column="2">
+        <TextBlock DockPanel.Dock="Top" Text="Faixas" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="40,40,80,*,80,2*,70,70" Margin="12,0,12,4" Opacity="0.7">
+          <TextBlock Grid.Column="1" Text="#" />
+          <TextBlock Grid.Column="2" Text="Tipo" />
+          <TextBlock Grid.Column="3" Text="Formato" />
+          <TextBlock Grid.Column="4" Text="Idioma" />
+          <TextBlock Grid.Column="5" Text="Nome" />
+          <TextBlock Grid.Column="6" Text="Padrão" />
+          <TextBlock Grid.Column="7" Text="Forçada" />
+        </Grid>
+        <ListBox ItemsSource="{Binding SelectedSource.Tracks, FallbackValue={x:Null}}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:TrackViewModel">
+              <Grid ColumnDefinitions="40,40,80,*,80,2*,70,70" IsEnabled="{Binding CanMux}">
+                <CheckBox IsChecked="{Binding Selected}" />
+                <TextBlock Grid.Column="1" Text="{Binding Index}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding TypeName}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="3" Text="{Binding Summary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBox Grid.Column="4" Text="{Binding Language}" Margin="0,0,8,0" MaxLength="3" />
+                <TextBox Grid.Column="5" Text="{Binding Title}" Margin="0,0,8,0" />
+                <CheckBox Grid.Column="6" IsChecked="{Binding IsDefault}" />
+                <CheckBox Grid.Column="7" IsChecked="{Binding IsForced}" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Grid>
+
+  </DockPanel>
+</Window>

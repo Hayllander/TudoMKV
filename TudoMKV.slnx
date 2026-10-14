@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TudoMKV.App/TudoMKV.App.csproj" />
+    <Project Path="src/TudoMKV.Core/TudoMKV.Core.csproj" />
+    <Project Path="src/TudoMKV.Muxing/TudoMKV.Muxing.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TudoMKV.Tests/TudoMKV.Tests.csproj" />
+  </Folder>
+</Solution>
