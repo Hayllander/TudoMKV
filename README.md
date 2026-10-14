@@ -2,12 +2,13 @@
 
 Aplicativo em C# com interface gráfica (Avalonia) para gravar vídeos em MKV, no estilo do MakeMKV.
 
-**Estado atual: etapa 2, arquivos e DVD.**
+Funciona como o MakeMKV: abra a origem, marque os títulos e faixas na árvore e clique em **Make MKV**.
 
-- **Arquivos:** arraste vídeos (MP4, M2TS, TS, VOB, AVI, MKV…), escolha as faixas, ajuste idioma, nome e as marcas de padrão/forçada, e grave em MKV sem recodificar.
-- **DVD:** em "Abrir DVD", escolha um drive, uma pasta VIDEO_TS ou uma imagem ISO (também dá para arrastar). Cada título vira um item da lista com suas faixas de vídeo, áudio e legenda; títulos com menos de 2 minutos ficam ocultos. O MKV sai com capítulos, idiomas e legendas DVD (VobSub) com a paleta original.
+- **DVD:** abra o `VIDEO_TS.IFO` (ou a pasta VIDEO_TS, um drive ou uma ISO).
+- **Blu-ray:** abra o `index.bdmv` ou o `MovieObject.bdmv` dentro da pasta BDMV (ou a própria pasta, ou um drive).
+- **Arquivos:** MP4, M2TS, TS, VOB, AVI, MKV… são remuxados para MKV.
 
-Blu-ray vem na próxima etapa.
+Títulos com menos de 2 minutos são pulados e o log diz por quê. O MKV sai sem recodificar, com capítulos, idiomas e legendas (VobSub no DVD, PGS no Blu-ray). Discos com proteção contra cópia (CSS, AACS) não são suportados.
 
 ## Download (Windows)
 
@@ -36,7 +37,7 @@ dotnet run --project src/TudoMKV.App -- "C:\Videos\filme.mp4"
 dotnet test
 ```
 
-Os testes de integração geram um MP4 de amostra e um DVD de teste (com `dvdauthor`, `spumux` e `genisoimage`) e gravam MKVs a partir deles. São pulados quando falta alguma dessas ferramentas.
+Os testes de integração geram um MP4 de amostra, um DVD de teste (com `dvdauthor`, `spumux` e `genisoimage`) e um Blu-ray de teste (com `tsMuxeR`) e gravam MKVs a partir deles. São pulados quando falta alguma dessas ferramentas.
 
 ## Gerar o executável para Windows
 
@@ -51,16 +52,16 @@ Gera `dist/TudoMKV-0.2.0-win-x64.zip` com o app autocontido e o FFmpeg da BtbN. 
 | Projeto | Papel |
 |---|---|
 | `src/TudoMKV.Core` | Modelos (`MediaSource`, `MediaTrack`, `MuxJob`) e contratos (`IMediaInspector`, `IMuxer`), sem dependências nativas. |
-| `src/TudoMKV.Disc` | Leitura de DVD em C# puro: arquivos IFO (títulos, capítulos, duração) e ISO 9660. |
-| `src/TudoMKV.Muxing` | `FfprobeInspector` (lê faixas via ffprobe), `DvdReader` (títulos de DVD pelo demuxer `dvdvideo`) e `FfmpegMuxer` (grava MKV com `-c copy`). |
-| `src/TudoMKV.App` | Interface Avalonia em MVVM (CommunityToolkit.Mvvm): lista de arquivos, faixas editáveis, fila com progresso e log. |
+| `src/TudoMKV.Disc` | Leitura de discos em C# puro: IFO e ISO 9660 do DVD; MPLS e CLPI do Blu-ray (títulos, capítulos, idiomas, tamanho). |
+| `src/TudoMKV.Muxing` | `SourceOpener` decide o que foi aberto; `DvdReader` (demuxer `dvdvideo`), `BlurayReader` (concatenação dos .m2ts da playlist + capítulos), `FfprobeInspector` e `FfmpegMuxer` (grava MKV com `-c copy`). |
+| `src/TudoMKV.App` | Interface Avalonia em MVVM no estilo MakeMKV: árvore Disco > Título > Faixas, pasta de saída, Make MKV, informações e log. |
 | `tests/TudoMKV.Tests` | Testes xUnit v3. |
 
 ## Plano
 
 1. **Remux de arquivos** (feito).
 2. **DVD** (feito): IFO lidos em C#, gravação pelo demuxer `dvdvideo` do FFmpeg.
-3. Blu-ray: leitura com libbluray, gravação pelo protocolo `bluray:` do FFmpeg.
+3. **Blu-ray** (feito): playlists lidas em C#, gravação pela concatenação dos .m2ts (o protocolo `bluray:` do FFmpeg recusa playlists com menos de 3 minutos).
 4. Metadados: modelos de nome de arquivo, perfis de idioma, mkvpropedit opcional.
 5. Detecção de bibliotecas opcionais instaladas pelo usuário.
 6. Instalador e builds para Linux e macOS.

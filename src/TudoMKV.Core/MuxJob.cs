@@ -30,7 +30,7 @@ public sealed class MuxJob
     }
 
     /// <summary>Cria um job com as faixas marcadas da origem, gravando ao lado dela ou em outra pasta.</summary>
-    public static MuxJob FromSelection(MediaSource source, string? outputDirectory = null)
+    public static MuxJob FromSelection(MediaSource source, string? outputDirectory = null, bool keepChapters = true)
     {
         var directory = outputDirectory
             ?? (source.IsDisc ? DefaultDiscOutputDirectory : Path.GetDirectoryName(source.Path) ?? ".");
@@ -46,6 +46,7 @@ public sealed class MuxJob
             Source = source,
             OutputPath = output,
             Tracks = source.Tracks.Where(t => t.Selected && t.CanMux).ToList(),
+            KeepChapters = keepChapters,
         };
     }
 }

@@ -32,9 +32,9 @@ public class IfoParserTests
     [Theory]
     [InlineData("MEU FILME", "MEU FILME")]
     [InlineData("A/B:C", "A_B_C")]
-    [InlineData("   ", "DVD")]
+    [InlineData("   ", "disco")]
     public void MakesSafeFileNames(string label, string expected)
     {
-        Assert.Equal(expected, DvdReader.SafeFileName(label));
+        Assert.Equal(expected, DiscTracks.SafeFileName(label));
     }
 }

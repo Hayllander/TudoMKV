@@ -88,6 +88,24 @@ public class FfmpegArgumentsTests
     }
 
     [Fact]
+    public void ReadsChaptersFromSeparateFileAndInputOptionsGoBeforeInput()
+    {
+        var source = new MediaSource
+        {
+            Path = "00800.ffconcat",
+            InputArguments = ["-f", "concat", "-safe", "0"],
+            ChaptersFile = "capitulos.txt",
+            Tracks = [Track(0, TrackType.Video, "h264")],
+        };
+
+        var text = ArgsText(MuxJob.FromSelection(source, "saida"));
+
+        Assert.Contains("-f concat -safe 0 -i 00800.ffconcat -i capitulos.txt", text);
+        Assert.Contains("-map_chapters 1", text);
+        Assert.Contains("-map 0:0", text);
+    }
+
+    [Fact]
     public void RefusesEmptySelection()
     {
         var job = new MuxJob { Source = Source(), OutputPath = "x.mkv", Tracks = [] };

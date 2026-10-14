@@ -1,17 +1,25 @@
+using TudoMKV.Disc.Bluray;
+
 namespace TudoMKV.Disc.Dvd;
 
-public sealed record DvdTitle(int Number, TimeSpan Duration, int Chapters, int Angles, int TitleSet, int Pgc);
+public sealed record DvdTitle(int Number, TimeSpan Duration, int Chapters, int Angles, int TitleSet, int Pgc, int Cells, long SizeBytes);
 
-/// <summary>Resultado da leitura dos IFO: rótulo, caminho que o ffmpeg deve abrir e títulos.</summary>
-public sealed record DvdDisc(string Label, string InputPath, IReadOnlyList<DvdTitle> Titles);
+/// <summary>Um título que não entrou na lista, e por quê (para o log).</summary>
+public sealed record DvdSkip(int Number, string Reason);
 
-/// <summary>Lista os títulos de um DVD a partir de um drive, de uma pasta (com ou sem VIDEO_TS no caminho) ou de uma ISO.</summary>
+/// <summary>Resultado da leitura dos IFO: rótulo, caminho que o ffmpeg deve abrir, títulos e pulados.</summary>
+public sealed record DvdDisc(string Label, string InputPath, IReadOnlyList<DvdTitle> Titles, IReadOnlyList<DvdSkip> Skipped);
+
+/// <summary>
+/// Lista os títulos de um DVD a partir do VIDEO_TS.IFO, da pasta VIDEO_TS, da pasta que a contém,
+/// da raiz de um drive ou de uma ISO.
+/// </summary>
 public static class DvdScanner
 {
     public static bool LooksLikeDvd(string path) =>
-        IsIso(path) || (Directory.Exists(path) && FindVideoTs(path) is not null);
+        IsIso(path) || IsIfo(path) || (Directory.Exists(path) && FindVideoTs(path) is not null);
 
-    public static DvdDisc Scan(string path)
+    public static DvdDisc Scan(string path, TimeSpan minimumLength)
     {
         var (source, inputPath, fallbackLabel) = Open(path);
         using (source)
@@ -20,6 +28,7 @@ public static class DvdScanner
                 ?? throw new InvalidDataException("VIDEO_TS.IFO não encontrado.");
 
             var titles = new List<DvdTitle>();
+            var skipped = new List<DvdSkip>();
             var seen = new HashSet<(int TitleSet, int Pgc)>();
             var titleSets = new Dictionary<int, byte[]?>();
 
@@ -33,22 +42,39 @@ public static class DvdScanner
 
                 if (vts is null)
                 {
+                    skipped.Add(new DvdSkip(title.Number, $"o arquivo VTS_{title.TitleSet:00}_0.IFO não existe"));
                     continue;
                 }
 
-                var (duration, pgc) = IfoParser.ParseTitleDuration(vts, title.TitleSetTitle);
+                TitleInfo info;
+                try
+                {
+                    info = IfoParser.ParseTitle(vts, title.TitleSetTitle);
+                }
+                catch (Exception ex) when (ex is InvalidDataException or ArgumentOutOfRangeException or IndexOutOfRangeException)
+                {
+                    skipped.Add(new DvdSkip(title.Number, "suas tabelas não puderam ser lidas"));
+                    continue;
+                }
+
+                if (info.Duration < minimumLength)
+                {
+                    skipped.Add(new DvdSkip(title.Number, $"sua duração é de {(int)info.Duration.TotalSeconds} segundos (mínimo {(int)minimumLength.TotalSeconds} segs.)"));
+                    continue;
+                }
 
                 // Alguns discos apontam vários títulos para a mesma PGC; mostramos só o primeiro.
-                if (!seen.Add((title.TitleSet, pgc)))
+                if (!seen.Add((title.TitleSet, info.FirstPgc)))
                 {
+                    skipped.Add(new DvdSkip(title.Number, "é uma cópia de outro título"));
                     continue;
                 }
 
-                titles.Add(new DvdTitle(title.Number, duration, title.Chapters, title.Angles, title.TitleSet, pgc));
+                titles.Add(new DvdTitle(title.Number, info.Duration, title.Chapters, title.Angles, title.TitleSet, info.FirstPgc, info.Cells, info.Sectors * 2048));
             }
 
             var label = string.IsNullOrWhiteSpace(source.VolumeLabel) ? fallbackLabel : source.VolumeLabel!;
-            return new DvdDisc(label, inputPath, titles);
+            return new DvdDisc(label, inputPath, titles, skipped);
         }
     }
 
@@ -59,12 +85,17 @@ public static class DvdScanner
             return (new IsoDvdSource(path), path, Path.GetFileNameWithoutExtension(path));
         }
 
+        if (IsIfo(path))
+        {
+            path = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        }
+
         var videoTs = FindVideoTs(path)
             ?? throw new DirectoryNotFoundException($"Não encontrei a pasta VIDEO_TS em {path}.");
 
         // O ffmpeg abre a pasta que contém VIDEO_TS (ou a raiz do drive).
         var root = Path.GetDirectoryName(videoTs)!;
-        var driveLabel = DriveLabel(root);
+        var driveLabel = BlurayScanner.DriveLabel(root);
         var label = driveLabel ?? new DirectoryInfo(root).Name;
         return (new FolderDvdSource(videoTs, driveLabel), root, label);
     }
@@ -72,35 +103,18 @@ public static class DvdScanner
     private static bool IsIso(string path) =>
         File.Exists(path) && path.EndsWith(".iso", StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsIfo(string path) =>
+        File.Exists(path) && Path.GetFileName(path).Equals("VIDEO_TS.IFO", StringComparison.OrdinalIgnoreCase);
+
     private static string? FindVideoTs(string directory)
     {
-        var trimmed = Path.TrimEndingDirectorySeparator(directory);
+        var trimmed = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
         if (string.Equals(Path.GetFileName(trimmed), "VIDEO_TS", StringComparison.OrdinalIgnoreCase))
         {
             return trimmed;
         }
 
-        return Directory.EnumerateDirectories(directory)
+        return Directory.EnumerateDirectories(trimmed)
             .FirstOrDefault(d => string.Equals(Path.GetFileName(d), "VIDEO_TS", StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>Rótulo do volume quando a pasta é a raiz de um drive (ex.: D:\), senão null.</summary>
-    private static string? DriveLabel(string root)
-    {
-        try
-        {
-            var full = Path.GetFullPath(root);
-            if (!string.Equals(Path.GetPathRoot(full), full, StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            var drive = new DriveInfo(full);
-            return drive.IsReady && !string.IsNullOrWhiteSpace(drive.VolumeLabel) ? drive.VolumeLabel : null;
-        }
-        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
-        {
-            return null;
-        }
     }
 }

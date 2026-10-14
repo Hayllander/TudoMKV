@@ -15,6 +15,9 @@ public sealed class MediaTrack
     /// <summary>Índice do stream na origem, como o FFmpeg o numera.</summary>
     public required int Index { get; init; }
 
+    /// <summary>Identificador do stream no contêiner (PID no Blu-ray), quando existe.</summary>
+    public int? StreamId { get; init; }
+
     public required TrackType Type { get; init; }
 
     /// <summary>Nome do codec como o FFmpeg o reporta (h264, ac3, hdmv_pgs_subtitle...).</summary>

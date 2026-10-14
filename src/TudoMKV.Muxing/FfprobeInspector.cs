@@ -73,9 +73,11 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
 
         string? formatName = null;
         var duration = TimeSpan.Zero;
+        long size = 0;
         if (root.TryGetProperty("format", out var format))
         {
             formatName = GetString(format, "format_name");
+            _ = long.TryParse(GetString(format, "size"), NumberStyles.Integer, CultureInfo.InvariantCulture, out size);
             if (double.TryParse(GetString(format, "duration"), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds))
             {
                 duration = TimeSpan.FromSeconds(seconds);
@@ -90,6 +92,7 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
             FormatName = formatName,
             Duration = duration,
             ChapterCount = chapters,
+            SizeBytes = size,
             Tracks = tracks,
         };
     }
@@ -118,6 +121,7 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
         return new MediaTrack
         {
             Index = stream.GetProperty("index").GetInt32(),
+            StreamId = ParseId(GetString(stream, "id")),
             Type = type,
             Codec = GetString(stream, "codec_name") ?? GetString(tags, "mimetype") ?? "desconhecido",
             Language = string.IsNullOrWhiteSpace(language) ? "und" : language,
@@ -131,6 +135,12 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
             Selected = type is not TrackType.Data,
         };
     }
+
+    private static int? ParseId(string? id) =>
+        id is not null && id.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+        && int.TryParse(id.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
 
     private static string? GetString(JsonElement element, string name) =>
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value)

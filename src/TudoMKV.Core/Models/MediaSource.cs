@@ -18,6 +18,12 @@ public sealed class MediaSource
     /// <summary>Títulos de disco não são gravados ao lado da origem, que costuma ser somente leitura.</summary>
     public bool IsDisc { get; init; }
 
+    /// <summary>Capítulos em formato FFMETADATA, quando a origem não os traz (Blu-ray lido por playlist).</summary>
+    public string? ChaptersFile { get; init; }
+
+    /// <summary>Tamanho aproximado dos dados de vídeo, para exibir como o MakeMKV.</summary>
+    public long SizeBytes { get; init; }
+
     public string? FormatName { get; init; }
 
     public TimeSpan Duration { get; init; }

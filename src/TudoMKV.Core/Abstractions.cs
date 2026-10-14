@@ -8,13 +8,23 @@ public interface IMediaInspector
     Task<MediaSource> InspectAsync(string path, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Resultado da leitura de um disco: um <see cref="MediaSource"/> por título que vale mostrar.</summary>
-public sealed record DiscContents(string Label, IReadOnlyList<MediaSource> Titles, int HiddenShortTitles);
+public enum SourceKind
+{
+    Files,
+    Dvd,
+    Bluray,
+}
 
-/// <summary>Lê um disco (drive, pasta ou imagem) e descreve cada título com suas faixas.</summary>
+/// <summary>
+/// O que foi aberto: um disco ou arquivos, com um <see cref="MediaSource"/> por título
+/// e as mensagens de leitura (títulos pulados, adicionados) para o log.
+/// </summary>
+public sealed record DiscContents(SourceKind Kind, string Label, IReadOnlyList<MediaSource> Titles, IReadOnlyList<string> Messages);
+
+/// <summary>Lê um disco (drive, pasta, IFO, index.bdmv ou imagem) e descreve cada título com suas faixas.</summary>
 public interface IDiscReader
 {
-    /// <summary>Se o caminho parece um disco que este leitor entende (drive, pasta VIDEO_TS, ISO...).</summary>
+    /// <summary>Se o caminho parece um disco que este leitor entende.</summary>
     bool CanRead(string path);
 
     Task<DiscContents> ReadAsync(string path, TimeSpan minimumLength, CancellationToken cancellationToken = default);

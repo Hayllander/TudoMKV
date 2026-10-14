@@ -6,6 +6,9 @@ namespace TudoMKV.Disc.Dvd;
 /// <summary>Entrada da tabela de títulos (TT_SRPT) do VIDEO_TS.IFO.</summary>
 public sealed record VmgTitle(int Number, int Angles, int Chapters, int TitleSet, int TitleSetTitle);
 
+/// <summary>Duração, primeira PGC (identifica títulos repetidos), número de células e tamanho em setores de um título.</summary>
+public sealed record TitleInfo(TimeSpan Duration, int FirstPgc, int Cells, long Sectors);
+
 /// <summary>
 /// Lê as tabelas dos arquivos IFO de um DVD-Video. Os IFO nunca são criptografados,
 /// então dá para listar títulos mesmo de discos que não conseguimos gravar.
@@ -37,9 +40,9 @@ public static class IfoParser
 
     /// <summary>
     /// Duração de um título dentro do seu VTS: soma das PGCs (cadeias de programa) que os capítulos usam.
-    /// Também devolve a primeira PGC, que identifica títulos repetidos.
+    /// Também conta células e setores, para mostrar o tamanho como o MakeMKV.
     /// </summary>
-    public static (TimeSpan Duration, int FirstPgc) ParseTitleDuration(byte[] vts, int titleSetTitle)
+    public static TitleInfo ParseTitle(byte[] vts, int titleSetTitle)
     {
         RequireSignature(vts, "DVDVIDEO-VTS");
 
@@ -74,13 +77,29 @@ public static class IfoParser
         var pgcTable = Sector(vts, 0xCC);
         var pgcCount = ReadUInt16(vts, pgcTable);
         var duration = TimeSpan.Zero;
+        var cells = 0;
+        long sectors = 0;
         foreach (var pgc in pgcs.Where(p => p >= 1 && p <= pgcCount))
         {
             var pgcStart = pgcTable + (int)ReadUInt32(vts, pgcTable + 8 + (pgc - 1) * 8 + 4);
             duration += ParseBcdTime(vts.AsSpan(pgcStart + 4, 4));
+
+            var cellCount = vts[pgcStart + 3];
+            var cellTable = pgcStart + ReadUInt16(vts, pgcStart + 0xE8);
+            cells += cellCount;
+            for (var c = 0; c < cellCount; c++)
+            {
+                var cell = cellTable + c * 24;
+                var first = ReadUInt32(vts, cell + 8);
+                var last = ReadUInt32(vts, cell + 20);
+                if (last >= first)
+                {
+                    sectors += last - first + 1;
+                }
+            }
         }
 
-        return (duration, pgcs[0]);
+        return new TitleInfo(duration, pgcs[0], cells, sectors);
     }
 
     /// <summary>Tempo no formato do DVD: horas, minutos e segundos em BCD, e quadros com a taxa nos 2 bits altos.</summary>

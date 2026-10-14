@@ -23,13 +23,20 @@ public static class FfmpegArguments
         args.AddRange(job.Source.InputArguments);
         args.AddRange(["-i", job.Source.Path]);
 
+        var chaptersInput = "0";
+        if (job.Source.ChaptersFile is { } chapters)
+        {
+            args.AddRange(["-i", chapters]);
+            chaptersInput = "1";
+        }
+
         foreach (var track in job.Tracks)
         {
             args.Add("-map");
             args.Add($"0:{track.Index}");
         }
 
-        args.AddRange(["-map_chapters", job.KeepChapters ? "0" : "-1"]);
+        args.AddRange(["-map_chapters", job.KeepChapters ? chaptersInput : "-1"]);
         args.AddRange(["-c", "copy"]);
 
         for (var output = 0; output < job.Tracks.Count; output++)
