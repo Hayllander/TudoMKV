@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Versão (ex.: 0.4.0)
+        description: 'Versão (ex.: 0.4.0)'
         required: true
 
 permissions:
