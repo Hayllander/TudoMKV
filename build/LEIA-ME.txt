@@ -1,0 +1,29 @@
+TudoMKV
+=======
+
+Como usar
+---------
+1. Extraia esta pasta inteira em qualquer lugar (ex.: C:\Programas\TudoMKV).
+2. Abra TudoMKV.exe. Não precisa instalar o .NET; ele já vem embutido.
+3. Use "Adicionar arquivos..." para remuxar vídeos (MP4, M2TS, TS, VOB, AVI, MKV)
+   ou "Abrir DVD" para ler um drive, uma pasta VIDEO_TS ou uma imagem ISO.
+4. Marque as faixas, ajuste idioma e nome se quiser, e clique em "Gravar selecionado".
+   Sem pasta de saída escolhida, arquivos são gravados ao lado da origem e DVDs
+   em Vídeos\TudoMKV.
+
+O Windows SmartScreen pode avisar que o aplicativo não é reconhecido, porque
+ele ainda não tem assinatura digital. Clique em "Mais informações" e
+"Executar assim mesmo".
+
+O ffmpeg e o ffprobe ficam em runtimes\ffmpeg. Você pode trocar por outra
+build, desde que tenha suporte a libdvdnav (para DVD).
+
+Aviso legal
+-----------
+O TudoMKV não contém nem distribui código para contornar proteções contra
+cópia (CSS, AACS). Ele lê DVDs sem proteção, cópias em pasta ou ISO e arquivos
+de vídeo comuns. DVDs comerciais protegidos não poderão ser gravados.
+
+Licenças: TudoMKV é GPLv3 (LICENSE.txt). FFmpeg é distribuído sob GPL
+(runtimes\ffmpeg\LICENSE-ffmpeg.txt), código-fonte em https://ffmpeg.org e
+https://github.com/BtbN/FFmpeg-Builds.

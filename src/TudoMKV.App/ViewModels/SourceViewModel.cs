@@ -18,10 +18,10 @@ public sealed class SourceViewModel(MediaSource source)
         get
         {
             var parts = new List<string> { Source.Duration.ToString(@"h\:mm\:ss") };
-            parts.Add($"{Source.Tracks.Count} faixas");
+            parts.Add(Source.Tracks.Count == 1 ? "1 faixa" : $"{Source.Tracks.Count} faixas");
             if (Source.ChapterCount > 0)
             {
-                parts.Add($"{Source.ChapterCount} capítulos");
+                parts.Add(Source.ChapterCount == 1 ? "1 capítulo" : $"{Source.ChapterCount} capítulos");
             }
 
             return string.Join(" · ", parts);

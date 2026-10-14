@@ -9,7 +9,11 @@ namespace TudoMKV.Muxing;
 /// <summary>Descreve um arquivo usando <c>ffprobe -print_format json</c>.</summary>
 public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspector
 {
-    public async Task<MediaSource> InspectAsync(string path, CancellationToken cancellationToken = default)
+    public Task<MediaSource> InspectAsync(string path, CancellationToken cancellationToken = default) =>
+        InspectAsync(path, [], cancellationToken);
+
+    /// <summary>Descreve a origem passando opções de entrada ao ffprobe (ex.: <c>-f dvdvideo -title 2</c>).</summary>
+    public async Task<MediaSource> InspectAsync(string path, IReadOnlyList<string> inputArguments, CancellationToken cancellationToken = default)
     {
         var startInfo = new ProcessStartInfo(ffprobePath ?? ToolLocator.Require("ffprobe"))
         {
@@ -18,11 +22,13 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var argument in new[]
-                 {
-                     "-v", "error", "-print_format", "json",
-                     "-show_format", "-show_streams", "-show_chapters", path,
-                 })
+        string[] arguments =
+        [
+            "-v", "error", "-print_format", "json",
+            "-show_format", "-show_streams", "-show_chapters",
+            .. inputArguments, "-i", path,
+        ];
+        foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
@@ -36,7 +42,15 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
 
         if (process.ExitCode != 0)
         {
-            throw new MuxException($"O ffprobe não conseguiu ler {Path.GetFileName(path)}.", await stderr);
+            var log = await stderr;
+            if (log.Contains("Unknown input format", StringComparison.Ordinal))
+            {
+                throw new MuxException(
+                    "Este ffmpeg não lê discos. Use uma build com libdvdnav e libbluray, como as da BtbN ou a \"full\" da gyan.dev.",
+                    log);
+            }
+
+            throw new MuxException($"O ffprobe não conseguiu ler {Path.GetFileName(Path.TrimEndingDirectorySeparator(path))}.", log);
         }
 
         return Parse(path, await stdout);

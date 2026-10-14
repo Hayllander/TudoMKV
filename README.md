@@ -2,18 +2,25 @@
 
 Aplicativo em C# com interface gráfica (Avalonia) para gravar vídeos em MKV, no estilo do MakeMKV.
 
-**Estado atual: etapa 1, remux de arquivos.** Arraste arquivos de vídeo (MP4, M2TS, TS, VOB, AVI, MKV…), escolha as faixas, ajuste idioma, nome e as marcas de padrão/forçada, e grave em MKV sem recodificar. Leitura de DVD e Blu-ray vem nas próximas etapas.
+**Estado atual: etapa 2, arquivos e DVD.**
+
+- **Arquivos:** arraste vídeos (MP4, M2TS, TS, VOB, AVI, MKV…), escolha as faixas, ajuste idioma, nome e as marcas de padrão/forçada, e grave em MKV sem recodificar.
+- **DVD:** em "Abrir DVD", escolha um drive, uma pasta VIDEO_TS ou uma imagem ISO (também dá para arrastar). Cada título vira um item da lista com suas faixas de vídeo, áudio e legenda; títulos com menos de 2 minutos ficam ocultos. O MKV sai com capítulos, idiomas e legendas DVD (VobSub) com a paleta original.
+
+Blu-ray vem na próxima etapa.
+
+## Download (Windows)
+
+Baixe o `TudoMKV-<versão>-win-x64.zip` em [Releases](../../releases), extraia e abra `TudoMKV.exe`. O .NET e o FFmpeg já vêm dentro.
 
 ## Requisitos
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- `ffmpeg` e `ffprobe` (versão 7 ou mais nova). O TudoMKV procura nesta ordem:
+- `ffmpeg` e `ffprobe` 7 ou mais novos, compilados com libdvdnav/libdvdread para ler DVD (as builds da [BtbN](https://github.com/BtbN/FFmpeg-Builds/releases) servem). O TudoMKV procura nesta ordem:
   1. a pasta indicada na variável de ambiente `TUDOMKV_FFMPEG_DIR`;
   2. `runtimes/ffmpeg/` ao lado do executável;
   3. a pasta do executável;
   4. o `PATH`.
-
-No Windows, uma build pronta do FFmpeg pode ser baixada em <https://www.gyan.dev/ffmpeg/builds/> ou <https://github.com/BtbN/FFmpeg-Builds/releases>.
 
 ## Como rodar
 
@@ -29,21 +36,30 @@ dotnet run --project src/TudoMKV.App -- "C:\Videos\filme.mp4"
 dotnet test
 ```
 
-Os testes de integração geram um MP4 de amostra com o ffmpeg e o remuxam; eles são pulados se o ffmpeg não estiver disponível.
+Os testes de integração geram um MP4 de amostra e um DVD de teste (com `dvdauthor`, `spumux` e `genisoimage`) e gravam MKVs a partir deles. São pulados quando falta alguma dessas ferramentas.
+
+## Gerar o executável para Windows
+
+```sh
+build/package-windows.sh 0.2.0
+```
+
+Gera `dist/TudoMKV-0.2.0-win-x64.zip` com o app autocontido e o FFmpeg da BtbN. Roda em Linux ou no Git Bash do Windows. Ao enviar uma tag `v*`, o workflow `Release` faz isso e publica a release.
 
 ## Estrutura
 
 | Projeto | Papel |
 |---|---|
 | `src/TudoMKV.Core` | Modelos (`MediaSource`, `MediaTrack`, `MuxJob`) e contratos (`IMediaInspector`, `IMuxer`), sem dependências nativas. |
-| `src/TudoMKV.Muxing` | `FfprobeInspector` (lê faixas via ffprobe) e `FfmpegMuxer` (grava MKV via ffmpeg com `-c copy`). |
+| `src/TudoMKV.Disc` | Leitura de DVD em C# puro: arquivos IFO (títulos, capítulos, duração) e ISO 9660. |
+| `src/TudoMKV.Muxing` | `FfprobeInspector` (lê faixas via ffprobe), `DvdReader` (títulos de DVD pelo demuxer `dvdvideo`) e `FfmpegMuxer` (grava MKV com `-c copy`). |
 | `src/TudoMKV.App` | Interface Avalonia em MVVM (CommunityToolkit.Mvvm): lista de arquivos, faixas editáveis, fila com progresso e log. |
 | `tests/TudoMKV.Tests` | Testes xUnit v3. |
 
 ## Plano
 
 1. **Remux de arquivos** (feito).
-2. DVD: leitura com libdvdread/libdvdnav, gravação pelo demuxer `dvdvideo` do FFmpeg.
+2. **DVD** (feito): IFO lidos em C#, gravação pelo demuxer `dvdvideo` do FFmpeg.
 3. Blu-ray: leitura com libbluray, gravação pelo protocolo `bluray:` do FFmpeg.
 4. Metadados: modelos de nome de arquivo, perfis de idioma, mkvpropedit opcional.
 5. Detecção de bibliotecas opcionais instaladas pelo usuário.

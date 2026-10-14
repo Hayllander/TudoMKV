@@ -2,10 +2,11 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TudoMKV.Core;
+using TudoMKV.Core.Models;
 
 namespace TudoMKV.App.ViewModels;
 
-public sealed partial class MainWindowViewModel(IMediaInspector inspector, IMuxer muxer) : ObservableObject
+public sealed partial class MainWindowViewModel(IMediaInspector inspector, IDiscReader discReader, IMuxer muxer) : ObservableObject
 {
     private bool _queueRunning;
 
@@ -27,29 +28,35 @@ public sealed partial class MainWindowViewModel(IMediaInspector inspector, IMuxe
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
 
-    public async Task AddFilesAsync(IEnumerable<string> paths)
+    /// <summary>Títulos de disco mais curtos que isto ficam ocultos (menus, avisos, trailers).</summary>
+    public TimeSpan MinimumTitleLength { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>Adiciona arquivos de vídeo, pastas de DVD, imagens ISO ou drives.</summary>
+    public async Task AddPathsAsync(IEnumerable<string> paths)
     {
         IsBusy = true;
         try
         {
             foreach (var path in paths)
             {
-                if (Sources.Any(s => string.Equals(s.Source.Path, path, StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-
                 try
                 {
-                    var source = await inspector.InspectAsync(path);
-                    var viewModel = new SourceViewModel(source);
-                    Sources.Add(viewModel);
-                    SelectedSource ??= viewModel;
-                    AddLog($"Lido: {source.DisplayName} ({viewModel.Details})");
+                    if (discReader.CanRead(path))
+                    {
+                        await AddDiscAsync(path);
+                    }
+                    else if (File.Exists(path))
+                    {
+                        await AddFileAsync(path);
+                    }
+                    else
+                    {
+                        AddLog($"{path}: não é um arquivo de vídeo nem um DVD.");
+                    }
                 }
-                catch (Exception ex) when (ex is MuxException or FileNotFoundException or InvalidOperationException)
+                catch (Exception ex) when (ex is MuxException or IOException or InvalidDataException or UnauthorizedAccessException or InvalidOperationException)
                 {
-                    AddLog($"Falha ao ler {Path.GetFileName(path)}: {ex.Message}");
+                    AddLog($"Falha ao ler {path}: {ex.Message}");
                     if (ex is MuxException { Log: { Length: > 0 } log })
                     {
                         AddLog(log);
@@ -61,6 +68,43 @@ public sealed partial class MainWindowViewModel(IMediaInspector inspector, IMuxe
         {
             IsBusy = false;
         }
+    }
+
+    private async Task AddFileAsync(string path)
+    {
+        var source = await inspector.InspectAsync(path);
+        if (AddSource(source) is { } viewModel)
+        {
+            AddLog($"Lido: {source.DisplayName} ({viewModel.Details})");
+        }
+    }
+
+    private async Task AddDiscAsync(string path)
+    {
+        AddLog($"Lendo disco em {path}…");
+        var contents = await discReader.ReadAsync(path, MinimumTitleLength);
+        foreach (var title in contents.Titles)
+        {
+            AddSource(title);
+        }
+
+        var hidden = contents.HiddenShortTitles > 0
+            ? $", {contents.HiddenShortTitles} curtos ocultos (menos de {MinimumTitleLength.TotalMinutes:0} min)"
+            : string.Empty;
+        AddLog($"DVD {contents.Label}: {contents.Titles.Count} títulos{hidden}.");
+    }
+
+    private SourceViewModel? AddSource(MediaSource source)
+    {
+        if (Sources.Any(s => s.Source.Key == source.Key))
+        {
+            return null;
+        }
+
+        var viewModel = new SourceViewModel(source);
+        Sources.Add(viewModel);
+        SelectedSource ??= viewModel;
+        return viewModel;
     }
 
     private bool HasSelection => SelectedSource is not null;

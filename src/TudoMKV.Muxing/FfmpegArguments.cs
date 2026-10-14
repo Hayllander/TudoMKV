@@ -19,11 +19,9 @@ public static class FfmpegArguments
             throw new ArgumentException("Nenhuma faixa selecionada.", nameof(job));
         }
 
-        var args = new List<string>
-        {
-            "-hide_banner", "-nostdin", "-y",
-            "-i", job.Source.Path,
-        };
+        var args = new List<string> { "-hide_banner", "-nostdin", "-y" };
+        args.AddRange(job.Source.InputArguments);
+        args.AddRange(["-i", job.Source.Path]);
 
         foreach (var track in job.Tracks)
         {

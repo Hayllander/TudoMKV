@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\TudoMKV.Core\TudoMKV.Core.csproj" />
+    <ProjectReference Include="..\TudoMKV.Disc\TudoMKV.Disc.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="TudoMKV.Tests" />
