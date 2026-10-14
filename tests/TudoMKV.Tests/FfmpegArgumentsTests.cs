@@ -88,6 +88,52 @@ public class FfmpegArgumentsTests
     }
 
     [Fact]
+    public void ReadsChaptersFromSeparateFileAndInputOptionsGoBeforeInput()
+    {
+        var source = new MediaSource
+        {
+            Path = "00800.ffconcat",
+            InputArguments = ["-f", "concat", "-safe", "0"],
+            ChaptersFile = "capitulos.txt",
+            Tracks = [Track(0, TrackType.Video, "h264")],
+        };
+
+        var text = ArgsText(MuxJob.FromSelection(source, "saida"));
+
+        Assert.Contains("-f concat -safe 0 -i 00800.ffconcat -i capitulos.txt", text);
+        Assert.Contains("-map_chapters 1", text);
+        Assert.Contains("-map 0:0", text);
+    }
+
+    [Fact]
+    public void WritesAppNameDateAndSourceIdLikeMakeMkv()
+    {
+        var video = Track(0, TrackType.Video, "h264");
+        video.SourceId = "001011";
+        var date = new DateTimeOffset(2026, 10, 14, 11, 50, 2, TimeSpan.Zero);
+
+        var text = string.Join(' ', FfmpegArguments.Build(MuxJob.FromSelection(Source(video, Track(1, TrackType.Audio, "ac3"))), date));
+
+        Assert.Contains($"-metadata encoding_tool={FfmpegArguments.WritingApplication}", text);
+        Assert.StartsWith("TudoMKV ", FfmpegArguments.WritingApplication);
+        Assert.Contains("-metadata creation_time=2026-10-14T11:50:02Z", text);
+        Assert.Contains("-metadata:s:0 SOURCE_ID=001011 -metadata:s:0 _STATISTICS_TAGS=SOURCE_ID", text);
+        Assert.Contains("-metadata:s:0 _STATISTICS_WRITING_DATE_UTC=2026-10-14 11:50:02", text);
+        Assert.DoesNotContain("-metadata:s:1 SOURCE_ID", text);
+    }
+
+    [Theory]
+    [InlineData(SourceKind.Bluray, 0x1011, "001011")]
+    [InlineData(SourceKind.Dvd, 0x1E0, "0100E0")]
+    [InlineData(SourceKind.Dvd, 0x80, "0180BD")]
+    [InlineData(SourceKind.Dvd, 0x20, "0120BD")]
+    [InlineData(SourceKind.Files, 0x1011, null)]
+    public void BuildsMakeMkvSourceIds(SourceKind kind, int streamId, string? expected)
+    {
+        Assert.Equal(expected, DiscTracks.SourceId(kind, streamId));
+    }
+
+    [Fact]
     public void RefusesEmptySelection()
     {
         var job = new MuxJob { Source = Source(), OutputPath = "x.mkv", Tracks = [] };

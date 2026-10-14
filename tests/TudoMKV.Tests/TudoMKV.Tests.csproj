@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\TudoMKV.Core\TudoMKV.Core.csproj" />
     <ProjectReference Include="..\..\src\TudoMKV.Muxing\TudoMKV.Muxing.csproj" />
+    <ProjectReference Include="..\..\src\TudoMKV.Disc\TudoMKV.Disc.csproj" />
   </ItemGroup>
 
   <ItemGroup>

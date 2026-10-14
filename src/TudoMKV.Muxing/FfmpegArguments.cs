@@ -1,3 +1,4 @@
+using System.Reflection;
 using TudoMKV.Core;
 using TudoMKV.Core.Models;
 
@@ -12,18 +13,29 @@ public static class FfmpegArguments
         ["mov_text"] = "srt",
     };
 
-    public static IReadOnlyList<string> Build(MuxJob job)
+    /// <summary>Nome gravado como "Writing application" do MKV, como o MakeMKV faz.</summary>
+    public static string WritingApplication { get; } = "TudoMKV " + AppVersion();
+
+    /// <param name="encodedAt">Data de gravação do MKV; por padrão, agora.</param>
+    public static IReadOnlyList<string> Build(MuxJob job, DateTimeOffset? encodedAt = null)
     {
+        var date = (encodedAt ?? DateTimeOffset.UtcNow).ToUniversalTime();
+
         if (job.Tracks.Count == 0)
         {
             throw new ArgumentException("Nenhuma faixa selecionada.", nameof(job));
         }
 
-        var args = new List<string>
+        var args = new List<string> { "-hide_banner", "-nostdin", "-y" };
+        args.AddRange(job.Source.InputArguments);
+        args.AddRange(["-i", job.Source.Path]);
+
+        var chaptersInput = "0";
+        if (job.Source.ChaptersFile is { } chapters)
         {
-            "-hide_banner", "-nostdin", "-y",
-            "-i", job.Source.Path,
-        };
+            args.AddRange(["-i", chapters]);
+            chaptersInput = "1";
+        }
 
         foreach (var track in job.Tracks)
         {
@@ -31,8 +43,10 @@ public static class FfmpegArguments
             args.Add($"0:{track.Index}");
         }
 
-        args.AddRange(["-map_chapters", job.KeepChapters ? "0" : "-1"]);
+        args.AddRange(["-map_chapters", job.KeepChapters ? chaptersInput : "-1"]);
         args.AddRange(["-c", "copy"]);
+        args.AddRange(["-metadata", $"encoding_tool={WritingApplication}"]);
+        args.AddRange(["-metadata", $"creation_time={date:yyyy-MM-ddTHH:mm:ss}Z"]);
 
         for (var output = 0; output < job.Tracks.Count; output++)
         {
@@ -52,6 +66,15 @@ public static class FfmpegArguments
             args.AddRange([$"-metadata:s:{output}", $"language={NormalizeLanguage(track.Language)}"]);
             args.AddRange([$"-metadata:s:{output}", $"title={track.Title ?? string.Empty}"]);
             args.AddRange([$"-disposition:{output}", Disposition(track)]);
+
+            if (track.SourceId is { } sourceId)
+            {
+                // O MediaInfo só confia em SOURCE_ID listado nas tags de estatística com data igual ou posterior à do MKV.
+                args.AddRange([$"-metadata:s:{output}", $"SOURCE_ID={sourceId}"]);
+                args.AddRange([$"-metadata:s:{output}", "_STATISTICS_TAGS=SOURCE_ID"]);
+                args.AddRange([$"-metadata:s:{output}", $"_STATISTICS_WRITING_APP={WritingApplication}"]);
+                args.AddRange([$"-metadata:s:{output}", $"_STATISTICS_WRITING_DATE_UTC={date:yyyy-MM-dd HH:mm:ss}"]);
+            }
         }
 
         // Evita erros de intercalação com legendas esparsas.
@@ -60,6 +83,14 @@ public static class FfmpegArguments
         args.AddRange(["-f", "matroska", job.OutputPath]);
 
         return args;
+    }
+
+    private static string AppVersion()
+    {
+        var version = typeof(FfmpegArguments).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+        var metadata = version.IndexOf('+', StringComparison.Ordinal);
+        return metadata < 0 ? version : version[..metadata];
     }
 
     private static string Disposition(MediaTrack track) => (track.IsDefault, track.IsForced) switch

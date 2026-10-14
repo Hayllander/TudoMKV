@@ -15,13 +15,13 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var viewModel = new MainWindowViewModel(new FfprobeInspector(), new FfmpegMuxer());
+            var viewModel = new MainWindowViewModel(new SourceOpener(new FfprobeInspector()), new FfmpegMuxer());
             var window = new MainWindow { DataContext = viewModel };
 
-            // Arquivos passados na linha de comando (ex.: "Abrir com" no Explorer) entram na lista.
+            // Caminho passado na linha de comando (ex.: "Abrir com" no Explorer) já abre.
             if (desktop.Args is { Length: > 0 } files)
             {
-                window.Opened += async (_, _) => await viewModel.AddFilesAsync(files);
+                window.Opened += async (_, _) => await viewModel.OpenAsync(files);
             }
 
             desktop.MainWindow = window;
