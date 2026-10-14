@@ -103,7 +103,7 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
         Assert.Equal("TESTE_DVD · Título 1", title.DisplayName);
         Assert.True(title.IsDisc);
         Assert.True(title.SizeBytes > 0);
-        Assert.Equal(["-f", "dvdvideo", "-title", "1"], title.InputArguments);
+        Assert.Equal(["-f", "dvdvideo", "-title", "1", "-trim", "0"], title.InputArguments);
         Assert.Equal(
             [(TrackType.Video, "und"), (TrackType.Audio, "por"), (TrackType.Audio, "eng"), (TrackType.Subtitle, "por")],
             title.Tracks.Select(t => (t.Type, t.Language)));

@@ -11,10 +11,19 @@ namespace TudoMKV.App.ViewModels;
 /// Tela única no estilo MakeMKV: abre uma origem, mostra a árvore Disco &gt; Título &gt; Faixas,
 /// e grava os títulos marcados na pasta de saída.
 /// </summary>
-public sealed partial class MainWindowViewModel(SourceOpener opener, IMuxer muxer) : ObservableObject
+public sealed partial class MainWindowViewModel : ObservableObject
 {
+    private readonly SourceOpener _opener;
+    private readonly IMuxer _muxer;
     private readonly List<(MediaSource Source, TreeNodeViewModel Title, TreeNodeViewModel? Chapters)> _titles = [];
     private CancellationTokenSource? _cancellation;
+
+    public MainWindowViewModel(SourceOpener opener, IMuxer muxer)
+    {
+        _opener = opener;
+        _muxer = muxer;
+        Log.CollectionChanged += (_, _) => OnPropertyChanged(nameof(LogText));
+    }
 
     /// <summary>Títulos mais curtos que isto são pulados (menus, avisos, trailers), como no MakeMKV.</summary>
     public TimeSpan MinimumTitleLength { get; set; } = TimeSpan.FromSeconds(120);
@@ -22,6 +31,8 @@ public sealed partial class MainWindowViewModel(SourceOpener opener, IMuxer muxe
     public ObservableCollection<TreeNodeViewModel> Nodes { get; } = [];
 
     public ObservableCollection<string> Log { get; } = [];
+
+    public string LogText => string.Join(Environment.NewLine, Log);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(InfoText))]
@@ -63,7 +74,7 @@ public sealed partial class MainWindowViewModel(SourceOpener opener, IMuxer muxe
         StatusText = "Lendo…";
         try
         {
-            var contents = await opener.OpenAsync(paths, MinimumTitleLength);
+            var contents = await _opener.OpenAsync(paths, MinimumTitleLength);
             foreach (var message in contents.Messages)
             {
                 AddLog(message);
@@ -168,9 +179,37 @@ public sealed partial class MainWindowViewModel(SourceOpener opener, IMuxer muxe
             return Path.GetDirectoryName(Path.GetFullPath(paths[0]));
         }
 
-        var videos = Path.GetDirectoryName(MuxJob.DefaultDiscOutputDirectory)!;
-        var folder = string.Join("_", contents.Label.Split(Path.GetInvalidFileNameChars().Concat(['/', '\\', ':']).ToArray(), StringSplitOptions.TrimEntries));
-        return Path.Combine(videos, folder);
+        var source = Path.GetFullPath(paths[0]);
+        string? originDir = File.Exists(source)
+            ? Path.GetDirectoryName(source)
+            : (Directory.Exists(source) ? source : null);
+
+        if (originDir is not null)
+        {
+            try
+            {
+                var root = Path.GetPathRoot(originDir);
+                if (root is not null && Directory.Exists(root) && new DriveInfo(root).DriveType == DriveType.CDRom)
+                {
+                    originDir = null;
+                }
+            }
+            catch
+            {
+                // ignora; usa a pasta de origem
+            }
+        }
+
+        var label = string.Join("_", contents.Label
+            .Split(Path.GetInvalidFileNameChars().Concat(['/', '\\', ':']).ToArray(), StringSplitOptions.TrimEntries));
+
+        if (originDir is null)
+        {
+            var videos = Path.GetDirectoryName(MuxJob.DefaultDiscOutputDirectory)!;
+            return Path.Combine(videos, label);
+        }
+
+        return Path.Combine(originDir, label);
     }
 
     private bool CanMakeMkv() =>
@@ -202,7 +241,7 @@ public sealed partial class MainWindowViewModel(SourceOpener opener, IMuxer muxe
                 var progress = new Progress<double>(fraction =>
                     Progress = (index + fraction) / selected.Count * 100);
 
-                await muxer.MuxAsync(job, progress, _cancellation.Token);
+                await _muxer.MuxAsync(job, progress, _cancellation.Token);
                 done++;
                 AddLog($"Título gravado: {Path.GetFileName(job.OutputPath)}");
             }

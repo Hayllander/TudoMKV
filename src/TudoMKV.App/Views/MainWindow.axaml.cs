@@ -14,7 +14,7 @@ public partial class MainWindow : Window
     {
         Patterns =
         [
-            "*.IFO", "*.ifo", "*.bdmv", "*.BDMV", "*.iso", "*.ISO",
+            "*.IFO", "*.ifo", "*.bdmv", "*.BDMV", "*.iso", "*.ISO", "*.img", "*.IMG",
             "*.mkv", "*.mp4", "*.m4v", "*.mov", "*.m2ts", "*.mts", "*.ts", "*.vob", "*.avi", "*.webm", "*.mpg", "*.mpeg",
         ],
     };
@@ -37,9 +37,12 @@ public partial class MainWindow : Window
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems?[0] is { } item)
+        if (e.Action == NotifyCollectionChangedAction.Add)
         {
-            Dispatcher.UIThread.Post(() => LogList.ScrollIntoView(item), DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(() =>
+            {
+                LogBox.CaretIndex = LogBox.Text?.Length ?? 0;
+            }, DispatcherPriority.Background);
         }
     }
 

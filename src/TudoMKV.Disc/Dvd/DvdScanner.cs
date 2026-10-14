@@ -101,7 +101,8 @@ public static class DvdScanner
     }
 
     private static bool IsIso(string path) =>
-        File.Exists(path) && path.EndsWith(".iso", StringComparison.OrdinalIgnoreCase);
+        File.Exists(path) && (path.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
+                           || path.EndsWith(".img", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsIfo(string path) =>
         File.Exists(path) && Path.GetFileName(path).Equals("VIDEO_TS.IFO", StringComparison.OrdinalIgnoreCase);

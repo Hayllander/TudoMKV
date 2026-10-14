@@ -31,7 +31,7 @@ public sealed class DvdReader(FfprobeInspector inspector) : IDiscReader
 
     private async Task<MediaSource> ReadTitleAsync(DvdDisc disc, DvdTitle title, CancellationToken cancellationToken)
     {
-        string[] inputArguments = ["-f", "dvdvideo", "-title", title.Number.ToString(CultureInfo.InvariantCulture)];
+        string[] inputArguments = ["-f", "dvdvideo", "-title", title.Number.ToString(CultureInfo.InvariantCulture), "-trim", "0"];
         var probed = await inspector.InspectAsync(disc.InputPath, inputArguments, cancellationToken);
 
         DiscTracks.Prepare(probed.Tracks, SourceKind.Dvd);
