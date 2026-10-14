@@ -34,7 +34,7 @@ public sealed class DvdReader(FfprobeInspector inspector) : IDiscReader
         string[] inputArguments = ["-f", "dvdvideo", "-title", title.Number.ToString(CultureInfo.InvariantCulture)];
         var probed = await inspector.InspectAsync(disc.InputPath, inputArguments, cancellationToken);
 
-        DiscTracks.MarkDefaults(probed.Tracks);
+        DiscTracks.Prepare(probed.Tracks, SourceKind.Dvd);
 
         return new MediaSource
         {
@@ -55,6 +55,21 @@ public sealed class DvdReader(FfprobeInspector inspector) : IDiscReader
 /// <summary>Regras comuns a DVD e Blu-ray.</summary>
 internal static class DiscTracks
 {
+    /// <summary>Deixa as faixas de um título como o MakeMKV grava: padrões, nomes de áudio e origem.</summary>
+    public static void Prepare(IReadOnlyList<MediaTrack> tracks, SourceKind kind)
+    {
+        MarkDefaults(tracks);
+        foreach (var track in tracks)
+        {
+            if (track.Type == TrackType.Audio && string.IsNullOrEmpty(track.Title))
+            {
+                track.Title = AudioTitle(track.Channels);
+            }
+
+            track.SourceId = SourceId(kind, track.StreamId);
+        }
+    }
+
     /// <summary>Discos não marcam faixas padrão; marcamos o primeiro vídeo e o primeiro áudio.</summary>
     public static void MarkDefaults(IReadOnlyList<MediaTrack> tracks)
     {
@@ -71,6 +86,28 @@ internal static class DiscTracks
             }
         }
     }
+
+    /// <summary>Os mesmos nomes que o MakeMKV dá às faixas de áudio.</summary>
+    public static string? AudioTitle(int? channels) => channels switch
+    {
+        1 => "Mono",
+        2 => "Stereo",
+        6 => "Surround 5.1",
+        8 => "Surround 7.1",
+        _ => null,
+    };
+
+    /// <summary>
+    /// Blu-ray: "00" + PID (0x1011 vira "001011"). DVD: "01" + subfluxo + fluxo; o demuxer dvdvideo numera
+    /// o vídeo 0x1E0 e o MPEG áudio 0x1C0 (fluxo próprio) e o AC3, DTS, LPCM e legendas pelo subfluxo do 0xBD.
+    /// </summary>
+    public static string? SourceId(SourceKind kind, int? streamId) => (kind, streamId) switch
+    {
+        (SourceKind.Bluray, { } pid) when pid is > 0 and <= 0xFFFF => $"00{pid:X4}",
+        (SourceKind.Dvd, { } id) when id is >= 0x100 and <= 0x1FF => $"0100{id & 0xFF:X2}",
+        (SourceKind.Dvd, { } id) when id is >= 0 and <= 0xFF => $"01{id:X2}BD",
+        _ => null,
+    };
 
     public static string SafeFileName(string name)
     {

@@ -18,6 +18,12 @@ public sealed class MediaTrack
     /// <summary>Identificador do stream no contêiner (PID no Blu-ray), quando existe.</summary>
     public int? StreamId { get; init; }
 
+    /// <summary>
+    /// Identificador da faixa no disco de origem no formato da tag SOURCE_ID do MakeMKV
+    /// ("00" + PID no Blu-ray, "01" + subfluxo + fluxo no DVD), que o MediaInfo mostra como origem.
+    /// </summary>
+    public string? SourceId { get; set; }
+
     public required TrackType Type { get; init; }
 
     /// <summary>Nome do codec como o FFmpeg o reporta (h264, ac3, hdmv_pgs_subtitle...).</summary>

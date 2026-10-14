@@ -133,6 +133,8 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
             [("mpeg2video", "und"), ("ac3", "por"), ("ac3", "eng"), ("dvd_subtitle", "por")],
             result.Tracks.Select(t => (t.Codec, t.Language)));
         Assert.True(result.Tracks[1].IsDefault);
+        Assert.Equal(["0100E0", "0180BD", "0181BD", "0120BD"], result.Tracks.Select(t => t.SourceId));
+        Assert.Equal("Mono", result.Tracks[1].Title);
     }
 
     [Fact]

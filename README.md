@@ -42,10 +42,10 @@ Os testes de integração geram um MP4 de amostra, um DVD de teste (com `dvdauth
 ## Gerar o executável para Windows
 
 ```sh
-build/package-windows.sh 0.2.0
+build/package-windows.sh 0.4.0
 ```
 
-Gera `dist/TudoMKV-0.2.0-win-x64.zip` com o app autocontido e o FFmpeg da BtbN. Roda em Linux ou no Git Bash do Windows. Ao enviar uma tag `v*`, o workflow `Release` faz isso e publica a release.
+Gera `dist/TudoMKV-0.4.0-win-x64.zip` com o app autocontido e o FFmpeg da BtbN. Roda em Linux ou no Git Bash do Windows. Ao enviar uma tag `v*`, o workflow `Release` faz isso e publica a release.
 
 ## Estrutura
 

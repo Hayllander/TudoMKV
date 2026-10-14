@@ -53,7 +53,7 @@ public sealed class BlurayReader(FfprobeInspector inspector) : IDiscReader
         // A concatenação perde os PIDs; as faixas (mesma ordem) vêm do primeiro .m2ts, que os tem.
         var probed = await inspector.InspectAsync(title.ClipPaths[0], cancellationToken);
         ApplyPlaylistStreams(probed.Tracks, title.Content.Streams);
-        DiscTracks.MarkDefaults(probed.Tracks);
+        DiscTracks.Prepare(probed.Tracks, SourceKind.Bluray);
 
         return new MediaSource
         {
