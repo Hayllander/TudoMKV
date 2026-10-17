@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using TudoMKV.Core;
 using TudoMKV.Core.Models;
 using TudoMKV.Disc.Dvd;
@@ -36,15 +37,27 @@ public sealed class DvdReader(FfprobeInspector inspector) : IDiscReader
 
         DiscTracks.Prepare(probed.Tracks, SourceKind.Dvd);
 
+        // Os capítulos do demuxer dvdvideo contam o tempo do IFO NTSC sem o fator 1,001 e vão se adiantando
+        // (quase 4 s no fim de 1 h); gravamos os nossos, pelas células, como o MakeMKV.
+        string? chapters = null;
+        if (title.ChapterStarts.Count > 0)
+        {
+            chapters = Path.Combine(BlurayReader.WorkDirectory(disc.InputPath), $"dvd_t{title.Number:00}.chapters.txt");
+            await File.WriteAllTextAsync(chapters, DiscTracks.BuildChapters(title.ChapterStarts, title.Duration), cancellationToken);
+        }
+
         return new MediaSource
         {
             Path = disc.InputPath,
             InputArguments = inputArguments,
+            ChaptersFile = chapters,
             Name = $"{disc.Label} · Título {title.Number}",
+            TitleNumber = title.Number,
+            DiscTitleSet = title.TitleSet,
             OutputBaseName = $"{DiscTracks.SafeFileName(disc.Label)}_t{title.Number:00}",
             IsDisc = true,
             FormatName = probed.FormatName,
-            Duration = probed.Duration > TimeSpan.Zero ? probed.Duration : title.Duration,
+            Duration = title.Duration > TimeSpan.Zero ? title.Duration : probed.Duration,
             ChapterCount = Math.Max(probed.ChapterCount, title.Chapters),
             SizeBytes = title.SizeBytes,
             Tracks = probed.Tracks,
@@ -108,6 +121,25 @@ internal static class DiscTracks
         (SourceKind.Dvd, { } id) when id is >= 0 and <= 0xFF => $"01{id:X2}BD",
         _ => null,
     };
+
+    /// <summary>Capítulos em FFMETADATA, de cada início até o próximo (o último vai até o fim do título).</summary>
+    public static string BuildChapters(IReadOnlyList<TimeSpan> starts, TimeSpan total)
+    {
+        var builder = new StringBuilder(";FFMETADATA1\n");
+        for (var i = 0; i < starts.Count; i++)
+        {
+            var start = (long)(starts[i].TotalSeconds * 1000);
+            var end = (long)((i + 1 < starts.Count ? starts[i + 1] : total).TotalSeconds * 1000);
+            if (end <= start)
+            {
+                continue;
+            }
+
+            builder.Append(CultureInfo.InvariantCulture, $"[CHAPTER]\nTIMEBASE=1/1000\nSTART={start}\nEND={end}\ntitle=Capítulo {i + 1:00}\n");
+        }
+
+        return builder.ToString();
+    }
 
     public static string SafeFileName(string name)
     {

@@ -51,6 +51,16 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
         Assert.True(DvdScanner.LooksLikeDvd(path));
     }
 
+    [Theory]
+    [InlineData("TESTE_ISO", true)]
+    [InlineData("DVD_VIDEO", true)]
+    [InlineData("20110204_1906", false)]
+    [InlineData("2011-02-04 19 06", false)]
+    [InlineData("   ", false)]
+    [InlineData(null, false)]
+    public void IgnoresVolumeLabelsThatAreOnlyNumbers(string? label, bool meaningful) =>
+        Assert.Equal(meaningful, DvdScanner.IsMeaningfulLabel(label));
+
     [Fact]
     public void ScansTitlesFromIso()
     {
@@ -138,6 +148,42 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
     }
 
     [Fact]
+    public async Task HybridJobUsesPhysicalVobsForVideoAudioAndKeepsSubtitlesAndChapters()
+    {
+        SkipIfUnavailable();
+        var inspector = new FfprobeInspector();
+        var contents = await new DvdReader(inspector).ReadAsync(dvd.Root, TimeSpan.Zero, TestContext.Current.CancellationToken);
+        var title = contents.Titles[0];
+
+        var job = await new SelectionMuxJobBuilder(inspector).CreateAsync(title, _output, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Single(job.ExtraSources);
+        Assert.Equal(1, job.ChaptersSourceIndex);
+        Assert.Equal(["-fflags", "+genpts"], job.Source.InputArguments);
+        Assert.Contains(job.Tracks, track => track.Type == TrackType.Video && track.InputIndex == 0);
+        Assert.Contains(job.Tracks, track => track.Type == TrackType.Audio && track.InputIndex == 0);
+        Assert.Contains(job.Tracks, track => track.Type == TrackType.Subtitle && track.InputIndex == 1);
+
+        try
+        {
+            await new FfmpegMuxer().MuxAsync(job, cancellationToken: TestContext.Current.CancellationToken);
+
+            var result = await inspector.InspectAsync(job.OutputPath, TestContext.Current.CancellationToken);
+            Assert.Equal(2, result.ChapterCount);
+            Assert.Equal(
+                [("mpeg2video", "und"), ("ac3", "por"), ("ac3", "eng"), ("dvd_subtitle", "por")],
+                result.Tracks.Select(t => (t.Codec, t.Language)));
+        }
+        finally
+        {
+            foreach (var path in job.TemporaryFiles)
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
     public async Task RipsTitleFromIso()
     {
         SkipIfUnavailable();
@@ -151,5 +197,64 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
         Assert.Equal(Path.Combine(_output, "TESTE_ISO_t02.mkv"), job.OutputPath);
         var result = await inspector.InspectAsync(job.OutputPath, TestContext.Current.CancellationToken);
         Assert.Equal(2, result.Tracks.Count);
+    }
+
+    [Fact]
+    public async Task IsoWithFilesAtRootRipsOnWindowsOrExplainsElsewhere()
+    {
+        SkipIfUnavailable();
+        Assert.SkipWhen(dvd.RootFilesIsoPath is null, "genisoimage não encontrado");
+
+        if (!OperatingSystem.IsWindows())
+        {
+            var ex = Assert.Throws<InvalidDataException>(() => DvdScanner.Scan(dvd.RootFilesIsoPath!, TimeSpan.Zero));
+            Assert.Contains("Extraia o conteúdo da ISO para uma pasta VIDEO_TS", ex.Message);
+            return;
+        }
+
+        await RipFirstTitleAsync(dvd.RootFilesIsoPath!, "TESTE_RAIZ", expectedTitles: 2);
+    }
+
+    /// <summary>
+    /// ISO real com os arquivos na raiz (ex.: TUDOMKV_TESTE_ISO_RAIZ="G:\Volcano High.iso"); grava o título mais curto.
+    /// </summary>
+    [Fact]
+    public async Task RipsRealIsoWithFilesAtRoot()
+    {
+        var iso = Environment.GetEnvironmentVariable("TUDOMKV_TESTE_ISO_RAIZ");
+        Assert.SkipWhen(string.IsNullOrEmpty(iso) || !File.Exists(iso), "defina TUDOMKV_TESTE_ISO_RAIZ com uma ISO real");
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "só no Windows");
+
+        await RipFirstTitleAsync(iso!, label: null, expectedTitles: null);
+    }
+
+    private async Task RipFirstTitleAsync(string iso, string? label, int? expectedTitles)
+    {
+        var inspector = new FfprobeInspector();
+        try
+        {
+            var contents = await new DvdReader(inspector).ReadAsync(iso, TimeSpan.Zero, TestContext.Current.CancellationToken);
+            if (label is not null)
+            {
+                Assert.Equal(label, contents.Label);
+            }
+
+            if (expectedTitles is not null)
+            {
+                Assert.Equal(expectedTitles, contents.Titles.Count);
+            }
+
+            var title = contents.Titles.MinBy(t => t.Duration)!;
+            var job = MuxJob.FromSelection(title, _output);
+            await new FfmpegMuxer().MuxAsync(job, cancellationToken: TestContext.Current.CancellationToken);
+
+            var result = await inspector.InspectAsync(job.OutputPath, TestContext.Current.CancellationToken);
+            Assert.Equal(title.Tracks.Count, result.Tracks.Count);
+            Assert.InRange(result.Duration.TotalSeconds, title.Duration.TotalSeconds - 2, title.Duration.TotalSeconds + 2);
+        }
+        finally
+        {
+            IsoMount.ReleaseAll();
+        }
     }
 }

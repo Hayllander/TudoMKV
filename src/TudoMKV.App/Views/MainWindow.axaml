@@ -4,53 +4,122 @@
         x:Class="TudoMKV.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="TudoMKV"
-        Width="1180" Height="760" MinWidth="820" MinHeight="520"
+        Width="1180" Height="760" MinWidth="860" MinHeight="540"
+        Background="{DynamicResource PageBackground}"
         DragDrop.AllowDrop="True">
 
   <Window.Resources>
-    <StreamGeometry x:Key="IconFolder">M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z</StreamGeometry>
-    <StreamGeometry x:Key="IconFile">M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,12V17L12,14.5L8,12Z</StreamGeometry>
-    <StreamGeometry x:Key="IconDisc">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16M12,10.5A1.5,1.5 0 0,0 10.5,12A1.5,1.5 0 0,0 12,13.5A1.5,1.5 0 0,0 13.5,12A1.5,1.5 0 0,0 12,10.5Z</StreamGeometry>
-    <StreamGeometry x:Key="IconSave">M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z</StreamGeometry>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="PageBackground" Color="#F3F4F6" />
+          <SolidColorBrush x:Key="CardBackground" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="CardBorder" Color="#E2E4E8" />
+          <SolidColorBrush x:Key="HeaderBackground" Color="#F8F9FA" />
+          <SolidColorBrush x:Key="MutedText" Color="#6B7280" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="#DCEBFA" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPointerOver" Color="#CDE2F7" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#F1F3F5" />
+          <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#111827" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="PageBackground" Color="#1B1C1F" />
+          <SolidColorBrush x:Key="CardBackground" Color="#25262A" />
+          <SolidColorBrush x:Key="CardBorder" Color="#34363B" />
+          <SolidColorBrush x:Key="HeaderBackground" Color="#2B2C31" />
+          <SolidColorBrush x:Key="MutedText" Color="#9CA3AF" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="#1F3A57" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPointerOver" Color="#25466A" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#2F3035" />
+          <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#F3F4F6" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+
+      <StreamGeometry x:Key="IconFolder">M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z</StreamGeometry>
+      <StreamGeometry x:Key="IconFile">M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,12V17L12,14.5L8,12Z</StreamGeometry>
+      <StreamGeometry x:Key="IconDisc">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16M12,10.5A1.5,1.5 0 0,0 10.5,12A1.5,1.5 0 0,0 12,13.5A1.5,1.5 0 0,0 13.5,12A1.5,1.5 0 0,0 12,10.5Z</StreamGeometry>
+      <StreamGeometry x:Key="IconSave">M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z</StreamGeometry>
+      <StreamGeometry x:Key="IconSun">M12,7A5,5 0 1,1 12,17A5,5 0 1,1 12,7M11,1H13V4H11V1M11,20H13V23H11V20M1,11H4V13H1V11M20,11H23V13H20V11M4.22,5.64L5.64,4.22L7.76,6.34L6.34,7.76L4.22,5.64M16.24,17.66L17.66,16.24L19.78,18.36L18.36,19.78L16.24,17.66M4.22,18.36L6.34,16.24L7.76,17.66L5.64,19.78L4.22,18.36M16.24,6.34L18.36,4.22L19.78,5.64L17.66,7.76L16.24,6.34Z</StreamGeometry>
+      <StreamGeometry x:Key="IconMoon">M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95Z</StreamGeometry>
+      <StreamGeometry x:Key="IconChevronDown">M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z</StreamGeometry>
+      <StreamGeometry x:Key="IconInfo">M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z</StreamGeometry>
+    </ResourceDictionary>
   </Window.Resources>
 
   <Window.Styles>
+    <!-- Cartões: fundo próprio sobre a janela, borda leve e cantos arredondados -->
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource CardBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+    <Style Selector="Border.cardHeader">
+      <Setter Property="Background" Value="{DynamicResource HeaderBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="MinHeight" Value="32" />
+    </Style>
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource MutedText}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource MutedText}" />
+    </Style>
+
+    <!-- Botões da barra: ícone + texto, sem fundo até passar o mouse -->
     <Style Selector="Button.tool">
-      <Setter Property="Padding" Value="6" />
+      <Setter Property="Padding" Value="10,6" />
       <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="4" />
     </Style>
     <Style Selector="Button.tool PathIcon">
-      <Setter Property="Width" Value="22" />
-      <Setter Property="Height" Value="22" />
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
     </Style>
-    <Style Selector="HeaderedContentControl.group">
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" CornerRadius="3" Padding="8,4,8,8">
-            <DockPanel>
-              <TextBlock DockPanel.Dock="Top" Text="{TemplateBinding Header}" FontSize="12" Margin="0,0,0,6" Opacity="0.8" />
-              <ContentPresenter Content="{TemplateBinding Content}" />
-            </DockPanel>
-          </Border>
-        </ControlTemplate>
-      </Setter>
+    <Style Selector="Button.tool TextBlock">
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+
+    <Style Selector="Button.accent">
+      <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="Button.accent:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SystemAccentColorDark1}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.accent:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SystemAccentColorDark2}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+
     <Style Selector="TreeViewItem">
-      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="MinHeight" Value="28" />
       <Setter Property="IsExpanded" Value="{Binding IsExpanded, DataType=vm:TreeNodeViewModel}" />
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="Auto,Auto,3*,5,1.3*,Auto">
+  <Grid RowDefinitions="Auto,Auto,*,8,170,Auto">
 
     <!-- Menu -->
-    <Menu Grid.Row="0">
+    <Menu Grid.Row="0" Background="{DynamicResource CardBackground}">
       <MenuItem Header="_Arquivo">
         <MenuItem Header="Abrir _arquivo…" InputGesture="Ctrl+O" HotKey="Ctrl+O" Click="OnOpenFileClick" />
         <MenuItem Header="Abrir _pasta de disco…" Click="OnOpenFolderClick" />
         <MenuItem Header="Abrir _disco" x:Name="DiscMenu" SubmenuOpened="OnDiscMenuOpened">
           <MenuItem Header="(procurando…)" IsEnabled="False" />
         </MenuItem>
+        <Separator />
+        <MenuItem Header="_Preferências…" Click="OnPreferencesClick" />
         <Separator />
         <MenuItem Header="_Sair" Click="OnExitClick" />
       </MenuItem>
@@ -60,55 +129,93 @@
     </Menu>
 
     <!-- Barra de ferramentas -->
-    <Border Grid.Row="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,0,0,1" Padding="6,2">
-      <StackPanel Orientation="Horizontal" Spacing="2">
-        <Button Classes="tool" ToolTip.Tip="Abrir arquivo (VIDEO_TS.IFO, index.bdmv, MovieObject.bdmv, ISO ou vídeo)" Click="OnOpenFileClick" IsEnabled="{Binding IsIdle}">
-          <PathIcon Data="{StaticResource IconFile}" />
+    <Border Grid.Row="1" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="0,0,0,1" Padding="8,4">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <Button Classes="tool" ToolTip.Tip="Abrir arquivo de origem (DVD: VIDEO_TS.IFO; Blu-ray: index.bdmv/MovieObject.bdmv; ISO, IMG ou vídeo) — Ctrl+O" Click="OnOpenFileClick" IsEnabled="{Binding IsIdle}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <PathIcon Data="{StaticResource IconFile}" />
+              <TextBlock Text="Abrir arquivo" />
+            </StackPanel>
+          </Button>
+          <Button Classes="tool" ToolTip.Tip="Abrir pasta de disco (a que contém VIDEO_TS ou BDMV)" Click="OnOpenFolderClick" IsEnabled="{Binding IsIdle}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <PathIcon Data="{StaticResource IconFolder}" />
+              <TextBlock Text="Abrir pasta" />
+            </StackPanel>
+          </Button>
+          <Button Classes="tool" ToolTip.Tip="Abrir o disco que está no drive" IsEnabled="{Binding IsIdle}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <PathIcon Data="{StaticResource IconDisc}" />
+              <TextBlock Text="Abrir disco" />
+              <PathIcon Data="{StaticResource IconChevronDown}" Width="14" Height="14" Opacity="0.7" />
+            </StackPanel>
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedLeft" Opening="OnDiscFlyoutOpening" />
+            </Button.Flyout>
+          </Button>
+        </StackPanel>
+        <Button Grid.Column="2" Classes="tool" ToolTip.Tip="Alternar tema claro/escuro" Click="OnToggleThemeClick">
+          <PathIcon x:Name="ThemeIcon" Data="{StaticResource IconMoon}" />
         </Button>
-        <Button Classes="tool" ToolTip.Tip="Abrir pasta de disco (VIDEO_TS ou BDMV)" Click="OnOpenFolderClick" IsEnabled="{Binding IsIdle}">
-          <PathIcon Data="{StaticResource IconFolder}" />
-        </Button>
-        <Button Classes="tool" ToolTip.Tip="Abrir disco no drive" IsEnabled="{Binding IsIdle}">
-          <PathIcon Data="{StaticResource IconDisc}" />
-          <Button.Flyout>
-            <MenuFlyout Placement="BottomEdgeAlignedLeft" Opening="OnDiscFlyoutOpening" />
-          </Button.Flyout>
-        </Button>
-        <Button Classes="tool" ToolTip.Tip="Make MKV: gravar os títulos marcados" Command="{Binding MakeMkvCommand}">
-          <PathIcon Data="{StaticResource IconSave}" />
-        </Button>
-      </StackPanel>
+      </Grid>
     </Border>
 
     <!-- Árvore e painel direito -->
-    <Grid Grid.Row="2" ColumnDefinitions="*,6,*" Margin="6,6,6,0">
+    <Grid Grid.Row="2" ColumnDefinitions="3*,8,2*" Margin="10,10,10,0">
 
-      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1">
+      <Border Classes="card">
         <DockPanel>
-          <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,0,0,1" Padding="8,3">
-            <Grid ColumnDefinitions="178,*">
-              <TextBlock Text="Tipo" FontSize="12" />
-              <TextBlock Grid.Column="1" Text="Descrição" FontSize="12" />
+          <Border DockPanel.Dock="Top" Classes="cardHeader">
+            <Grid ColumnDefinitions="Auto,10,*,8,Auto" VerticalAlignment="Center">
+              <TextBlock Classes="caption" Text="IMDb" />
+              <TextBox Grid.Column="2"
+                       Text="{Binding ImdbReference}"
+                       PlaceholderText="Cole aqui o link do IMDb ou o código tt1234567"
+                       VerticalAlignment="Center" />
+              <Button Grid.Column="4"
+                      Content="Verificar"
+                      Click="OnVerifyImdbClick"
+                      Padding="14,6"
+                      VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+          <Border DockPanel.Dock="Top" Classes="cardHeader">
+            <Grid ColumnDefinitions="176,*" VerticalAlignment="Center">
+              <TextBlock Classes="caption" Text="Tipo" />
+              <TextBlock Classes="caption" Grid.Column="1" Text="Descrição" />
             </Grid>
           </Border>
           <Panel>
-            <TreeView x:Name="Tree" ItemsSource="{Binding Nodes}" SelectedItem="{Binding SelectedNode}" FontSize="13">
+            <TreeView x:Name="Tree" ItemsSource="{Binding Nodes}" SelectedItem="{Binding SelectedNode}" FontSize="13"
+                      BorderThickness="0" Background="Transparent" Padding="0,4">
               <TreeView.ItemTemplate>
                 <TreeDataTemplate DataType="vm:TreeNodeViewModel" ItemsSource="{Binding Children}">
                   <Grid ColumnDefinitions="Auto,*">
-                    <StackPanel Orientation="Horizontal" Width="{Binding TypeWidth}" Spacing="4">
-                      <CheckBox IsChecked="{Binding IsChecked}" IsVisible="{Binding HasCheckBox}" MinWidth="0" MinHeight="0" Padding="0" />
+                    <StackPanel Orientation="Horizontal" Width="{Binding TypeWidth}" Spacing="6" VerticalAlignment="Center">
+                      <CheckBox IsChecked="{Binding IsChecked}" IsVisible="{Binding HasCheckBox}" MinWidth="0" MinHeight="0" Padding="0" VerticalAlignment="Center" />
+                      <PathIcon Data="{Binding IconData}" Width="16" Height="16" VerticalAlignment="Center" Opacity="0.7"
+                                IsVisible="{Binding IconData, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       <TextBlock Text="{Binding TypeText}" VerticalAlignment="Center" />
                     </StackPanel>
-                    <TextBlock Grid.Column="1" Text="{Binding Description}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text="{Binding Description}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="2,0" />
                   </Grid>
                 </TreeDataTemplate>
               </TreeView.ItemTemplate>
             </TreeView>
-            <TextBlock Text="Arraste um VIDEO_TS.IFO, um index.bdmv, uma pasta de disco ou vídeos para cá"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.55" TextWrapping="Wrap" TextAlignment="Center" Margin="24"
-                       IsVisible="{Binding !Nodes.Count}" />
-            <ProgressBar IsIndeterminate="True" VerticalAlignment="Bottom" IsVisible="{Binding IsBusy}" />
+
+            <!-- Nada aberto ainda -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Margin="24" IsVisible="{Binding !Nodes.Count}">
+              <PathIcon Data="{StaticResource IconDisc}" Width="56" Height="56" Opacity="0.25" />
+              <TextBlock Text="Arraste para cá um VIDEO_TS.IFO, index.bdmv, uma ISO, uma pasta VIDEO_TS/BDMV ou vídeos"
+                         Classes="muted" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="360" />
+              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                <Button Content="Abrir arquivo…" Click="OnOpenFileClick" IsEnabled="{Binding IsIdle}" />
+                <Button Content="Abrir pasta…" Click="OnOpenFolderClick" IsEnabled="{Binding IsIdle}" />
+              </StackPanel>
+            </StackPanel>
+
+            <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsBusy}" MinHeight="3" Height="3" />
           </Panel>
         </DockPanel>
       </Border>
@@ -116,44 +223,90 @@
       <GridSplitter Grid.Column="1" Background="Transparent" />
 
       <DockPanel Grid.Column="2">
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,6,Auto" Margin="0,0,0,6">
-          <HeaderedContentControl Classes="group" Header="Pasta de saída">
-            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-              <TextBox Text="{Binding OutputDirectory}" />
-              <Button Grid.Column="1" Classes="tool" Margin="4,0,0,0" ToolTip.Tip="Escolher pasta" Click="OnChooseOutputClick">
-                <PathIcon Data="{StaticResource IconFolder}" />
+
+        <!-- Saída e gravação -->
+        <Border DockPanel.Dock="Top" Classes="card" Margin="0,0,0,10">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Classes="cardHeader">
+              <TextBlock Classes="caption" Text="Pasta de saída" />
+            </Border>
+            <StackPanel Margin="12" Spacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox Text="{Binding OutputDirectory}" PlaceholderText="Escolha onde gravar os MKV" />
+                <Button Grid.Column="1" Margin="6,0,0,0" Padding="8" ToolTip.Tip="Escolher pasta" Click="OnChooseOutputClick" VerticalAlignment="Stretch">
+                  <PathIcon Data="{StaticResource IconFolder}" Width="18" Height="18" />
+                </Button>
+              </Grid>
+              <Button Classes="accent" Command="{Binding MakeMkvCommand}" ToolTip.Tip="Gravar os títulos marcados"
+                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="16,11">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <PathIcon Data="{StaticResource IconSave}" Width="20" Height="20" />
+                  <TextBlock Text="Make MKV" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="15" />
+                </StackPanel>
               </Button>
-            </Grid>
-          </HeaderedContentControl>
-          <HeaderedContentControl Grid.Column="2" Classes="group" Header="Make MKV">
-            <Button Command="{Binding MakeMkvCommand}" ToolTip.Tip="Gravar os títulos marcados" Padding="12,8" HorizontalAlignment="Center">
-              <PathIcon Data="{StaticResource IconSave}" Width="30" Height="30" />
-            </Button>
-          </HeaderedContentControl>
-        </Grid>
-        <HeaderedContentControl Classes="group" Header="Informações">
-          <ScrollViewer>
-            <SelectableTextBlock Text="{Binding InfoText}" TextWrapping="Wrap" FontSize="13" />
-          </ScrollViewer>
-        </HeaderedContentControl>
+              <TextBlock Text="{Binding SelectionSummary}" Classes="muted" FontSize="12" HorizontalAlignment="Center" Margin="0,-4,0,0" />
+            </StackPanel>
+          </DockPanel>
+        </Border>
+
+        <!-- Informações do item selecionado -->
+        <Border Classes="card">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Classes="cardHeader">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource MutedText}" />
+                <TextBlock Classes="caption" Text="{Binding InfoHeader}" />
+              </StackPanel>
+            </Border>
+            <ScrollViewer Padding="12,10">
+              <StackPanel Spacing="4">
+                <ItemsControl ItemsSource="{Binding InfoRows}" Grid.IsSharedSizeScope="True">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:InfoRow">
+                      <Grid Margin="0,3">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="InfoName" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Name}" Classes="muted" FontSize="13" Margin="0,0,16,0" />
+                        <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" FontSize="13" TextWrapping="Wrap" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <SelectableTextBlock Text="{Binding InfoHint}" IsVisible="{Binding InfoHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                     TextWrapping="Wrap" FontSize="13" LineHeight="20" />
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
       </DockPanel>
     </Grid>
 
     <GridSplitter Grid.Row="3" Background="Transparent" ResizeDirection="Rows" />
 
     <!-- Log -->
-    <Border Grid.Row="4" Margin="6,0,6,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1">
-      <TextBox x:Name="LogBox" Text="{Binding LogText}" IsReadOnly="True" FontSize="12" Padding="6"
-               TextWrapping="Wrap" AcceptsReturn="True"
-               ScrollViewer.VerticalScrollBarVisibility="Auto"
-               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-               Background="Transparent" BorderThickness="0" />
+    <Border Grid.Row="4" Classes="card" Margin="10,0">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Classes="cardHeader" Padding="12,2,4,2">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="caption" Text="Log" />
+            <Button Grid.Column="1" Classes="tool" Padding="8,3" FontSize="12" Content="Limpar" Command="{Binding ClearLogCommand}" ToolTip.Tip="Limpar o log" />
+          </Grid>
+        </Border>
+        <TextBox x:Name="LogBox" Text="{Binding LogText}" IsReadOnly="True" FontSize="12" Padding="12,8"
+                 FontFamily="Cascadia Mono, Consolas, Menlo, monospace"
+                 TextWrapping="Wrap" AcceptsReturn="True"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 Background="Transparent" BorderThickness="0" LineHeight="18" />
+      </DockPanel>
     </Border>
 
     <!-- Barra de status -->
-    <Grid Grid.Row="5" ColumnDefinitions="*,Auto,Auto" Margin="6,4,6,6">
-      <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis" />
-      <ProgressBar Grid.Column="1" Width="260" Margin="8,0" Value="{Binding Progress}" ShowProgressText="True" IsVisible="{Binding IsRipping}" />
+    <Grid Grid.Row="5" ColumnDefinitions="*,Auto,Auto" Margin="12,6,10,8" MinHeight="28">
+      <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontSize="12" Classes="muted" TextTrimming="CharacterEllipsis" />
+      <ProgressBar Grid.Column="1" Width="280" Margin="10,0" Value="{Binding Progress}" ShowProgressText="True" IsVisible="{Binding IsRipping}" VerticalAlignment="Center" />
       <Button Grid.Column="2" Content="Cancelar" Command="{Binding CancelCommand}" IsVisible="{Binding IsRipping}" />
     </Grid>
   </Grid>

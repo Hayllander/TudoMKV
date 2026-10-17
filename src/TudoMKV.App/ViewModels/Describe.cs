@@ -105,22 +105,34 @@ public static class Describe
         _ => "Dados",
     };
 
-    public static string Title(MediaSource source, string label)
+    /// <summary>"Título 3" num disco; "Arquivo" para vídeos comuns.</summary>
+    public static string TitleType(MediaSource source) =>
+        source.TitleNumber is { } number ? $"Título {number}" : "Arquivo";
+
+    /// <summary>Duração, capítulos e tamanho; arquivos comuns começam pelo nome (o disco já aparece na linha de cima).</summary>
+    public static string Title(MediaSource source)
     {
         var parts = new List<string>();
-        if (source.ChapterCount > 0)
+        if (source.TitleNumber is null)
         {
-            parts.Add($"{source.ChapterCount} capítulo(s)");
+            parts.Add(source.DisplayName);
         }
 
         parts.Add(Duration(source.Duration));
+        if (source.ChapterCount > 0)
+        {
+            parts.Add(Plural(source.ChapterCount, "capítulo", "capítulos"));
+        }
+
         if (Size(source.SizeBytes) is { Length: > 0 } size)
         {
             parts.Add(size);
         }
 
-        return $"{label} - {string.Join(", ", parts)}";
+        return string.Join("  ·  ", parts);
     }
+
+    public static string Plural(int count, string one, string many) => $"{count} {(count == 1 ? one : many)}";
 
     public static string Track(MediaTrack track)
     {

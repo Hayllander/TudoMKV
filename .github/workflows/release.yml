@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Versao (ex.: 0.4.0)"
+        description: "Versao (ex.: 0.4.6)"
         required: true
 
 permissions:
@@ -15,6 +15,8 @@ permissions:
 jobs:
   windows-package:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,10 +25,12 @@ jobs:
           global-json-file: global.json
 
       - name: Definir versão
+        id: version
         run: |
           VERSION="${{ github.event.inputs.version }}"
           if [[ -z "$VERSION" ]]; then VERSION="${GITHUB_REF_NAME#v}"; fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Empacotar para Windows
         run: build/package-windows.sh "$VERSION"
@@ -39,3 +43,27 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "TudoMKV $VERSION" \
             --notes-file build/release-notes.md
+
+  # O instalador usa o IExpress, que só existe no Windows, e é anexado ao release que o
+  # job acima acabou de criar.
+  windows-installer:
+    needs: windows-package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Gerar o instalador auto-extraível
+        shell: pwsh
+        run: build/package-installer.ps1 -Version "${{ needs.windows-package.outputs.version }}"
+
+      - name: Anexar o instalador ao release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "v${{ needs.windows-package.outputs.version }}" `
+            "dist/TudoMKV-${{ needs.windows-package.outputs.version }}-setup.exe" --clobber

@@ -106,6 +106,51 @@ public class FfmpegArgumentsTests
     }
 
     [Fact]
+    public void MapsTracksAndChaptersFromDifferentInputs()
+    {
+        var videoAudio = new MediaSource
+        {
+            Path = "merged.vob",
+            Tracks =
+            [
+                new MediaTrack { Index = 0, Type = TrackType.Video, Codec = "mpeg2video" },
+                new MediaTrack { Index = 1, Type = TrackType.Audio, Codec = "ac3" },
+            ],
+        };
+        var dvd = new MediaSource
+        {
+            Path = "VIDEO_TS",
+            InputArguments = ["-f", "dvdvideo", "-title", "1", "-trim", "0"],
+            Tracks =
+            [
+                new MediaTrack { Index = 0, Type = TrackType.Video, Codec = "mpeg2video" },
+                new MediaTrack { Index = 1, Type = TrackType.Audio, Codec = "ac3" },
+                new MediaTrack { Index = 2, Type = TrackType.Subtitle, Codec = "dvd_subtitle" },
+            ],
+        };
+
+        var job = new MuxJob
+        {
+            Source = videoAudio,
+            ExtraSources = [dvd],
+            OutputPath = "x.mkv",
+            Tracks =
+            [
+                new MediaTrack { InputIndex = 0, Index = 0, Type = TrackType.Video, Codec = "mpeg2video" },
+                new MediaTrack { InputIndex = 0, Index = 1, Type = TrackType.Audio, Codec = "ac3" },
+                new MediaTrack { InputIndex = 1, Index = 2, Type = TrackType.Subtitle, Codec = "dvd_subtitle" },
+            ],
+            ChaptersSourceIndex = 1,
+        };
+
+        var text = ArgsText(job);
+
+        Assert.Contains("-i merged.vob -f dvdvideo -title 1 -trim 0 -i VIDEO_TS", text);
+        Assert.Contains("-map 0:0 -map 0:1 -map 1:2", text);
+        Assert.Contains("-map_chapters 1", text);
+    }
+
+    [Fact]
     public void WritesAppNameDateAndSourceIdLikeMakeMkv()
     {
         var video = Track(0, TrackType.Video, "h264");

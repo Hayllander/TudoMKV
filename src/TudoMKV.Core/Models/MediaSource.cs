@@ -12,6 +12,12 @@ public sealed class MediaSource
     /// <summary>Nome para exibir; se vazio, usa o nome do arquivo.</summary>
     public string? Name { get; init; }
 
+    /// <summary>Número do título no disco (DVD/Blu-ray); vazio para arquivos comuns.</summary>
+    public int? TitleNumber { get; init; }
+
+    /// <summary>Número do VTS do DVD; vazio para arquivos comuns e Blu-ray.</summary>
+    public int? DiscTitleSet { get; init; }
+
     /// <summary>Nome do MKV sem extensão; se vazio, usa o nome do arquivo de origem.</summary>
     public string? OutputBaseName { get; init; }
 

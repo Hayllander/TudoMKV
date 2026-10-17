@@ -4,7 +4,7 @@ using TudoMKV.Muxing;
 namespace TudoMKV.Tests;
 
 /// <summary>
-/// Monta um DVD-Video de teste com ffmpeg + dvdauthor + spumux (e uma ISO com genisoimage, se houver):
+/// Monta um DVD-Video de teste com ffmpeg + dvdauthor + spumux (e ISOs com genisoimage, se houver: uma padrão e outra com os arquivos na raiz):
 /// título 1 com 8 s, 2 capítulos, áudio em português e inglês e uma legenda em português;
 /// título 2 com 3 s e um áudio em inglês. Fica indisponível se faltar alguma ferramenta.
 /// </summary>
@@ -16,6 +16,9 @@ public sealed class TestDvd : IAsyncLifetime
     public string Root => Path.Combine(_directory, "TESTE_DVD");
 
     public string? IsoPath { get; private set; }
+
+    /// <summary>ISO só ISO 9660, com VIDEO_TS.IFO, VTS_XX_Y.* na raiz e sem a pasta VIDEO_TS.</summary>
+    public string? RootFilesIsoPath { get; private set; }
 
     public string? SkipReason { get; private set; }
 
@@ -97,6 +100,8 @@ public sealed class TestDvd : IAsyncLifetime
         {
             IsoPath = Local("teste.iso");
             await Require(genisoimage, ["-quiet", "-dvd-video", "-V", "TESTE_ISO", "-o", IsoPath, Root]);
+            RootFilesIsoPath = Local("raiz.iso");
+            await Require(genisoimage, ["-quiet", "-V", "TESTE_RAIZ", "-o", RootFilesIsoPath, Path.Combine(Root, "VIDEO_TS")]);
         }
     }
 

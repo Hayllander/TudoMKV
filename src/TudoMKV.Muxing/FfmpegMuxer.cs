@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using TudoMKV.Core;
+using TudoMKV.Core.Models;
 
 namespace TudoMKV.Muxing;
 
@@ -77,6 +78,11 @@ public sealed class FfmpegMuxer(string? ffmpegPath = null) : IMuxer
             }
 
             throw new MuxException($"O ffmpeg terminou com código {process.ExitCode}.", log);
+        }
+
+        if (job.Tracks.Any(t => t.Type == TrackType.Video && string.Equals(t.Codec, "mpeg2video", StringComparison.OrdinalIgnoreCase)))
+        {
+            VlcMpeg2Compat.Apply(job.OutputPath);
         }
 
         progress?.Report(1.0);

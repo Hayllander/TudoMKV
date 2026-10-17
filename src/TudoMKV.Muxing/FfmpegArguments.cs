@@ -20,29 +20,54 @@ public static class FfmpegArguments
     public static IReadOnlyList<string> Build(MuxJob job, DateTimeOffset? encodedAt = null)
     {
         var date = (encodedAt ?? DateTimeOffset.UtcNow).ToUniversalTime();
+        var sources = job.AllSources;
 
         if (job.Tracks.Count == 0)
         {
             throw new ArgumentException("Nenhuma faixa selecionada.", nameof(job));
         }
 
-        var args = new List<string> { "-hide_banner", "-nostdin", "-y" };
-        args.AddRange(job.Source.InputArguments);
-        args.AddRange(["-i", job.Source.Path]);
-
-        var chaptersInput = "0";
-        if (job.Source.ChaptersFile is { } chapters)
+        if (job.ChaptersSourceIndex < 0 || job.ChaptersSourceIndex >= sources.Count)
         {
+            throw new ArgumentOutOfRangeException(nameof(job), "A origem de capítulos não existe.");
+        }
+
+        var args = new List<string> { "-hide_banner", "-nostdin", "-y" };
+        var mediaInputIndexes = new List<int>(sources.Count);
+        foreach (var source in sources)
+        {
+            mediaInputIndexes.Add(mediaInputIndexes.Count);
+            args.AddRange(source.InputArguments);
+            args.AddRange(["-i", source.Path]);
+        }
+
+        var chapterInputIndexes = new Dictionary<int, int>();
+        var nextInputIndex = mediaInputIndexes.Count;
+        for (var i = 0; i < sources.Count; i++)
+        {
+            if (sources[i].ChaptersFile is not { } chapters)
+            {
+                continue;
+            }
+
             args.AddRange(["-i", chapters]);
-            chaptersInput = "1";
+            chapterInputIndexes[i] = nextInputIndex++;
         }
 
         foreach (var track in job.Tracks)
         {
+            if (track.InputIndex < 0 || track.InputIndex >= sources.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(job), "Uma faixa aponta para uma origem inexistente.");
+            }
+
             args.Add("-map");
-            args.Add($"0:{track.Index}");
+            args.Add($"{mediaInputIndexes[track.InputIndex]}:{track.Index}");
         }
 
+        var chaptersInput = chapterInputIndexes.TryGetValue(job.ChaptersSourceIndex, out var chaptersFileInput)
+            ? chaptersFileInput.ToString()
+            : mediaInputIndexes[job.ChaptersSourceIndex].ToString();
         args.AddRange(["-map_chapters", job.KeepChapters ? chaptersInput : "-1"]);
         args.AddRange(["-c", "copy"]);
         args.AddRange(["-metadata", $"encoding_tool={WritingApplication}"]);

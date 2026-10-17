@@ -7,7 +7,11 @@ namespace TudoMKV.Disc.Dvd;
 public sealed record VmgTitle(int Number, int Angles, int Chapters, int TitleSet, int TitleSetTitle);
 
 /// <summary>Duração, primeira PGC (identifica títulos repetidos), número de células e tamanho em setores de um título.</summary>
-public sealed record TitleInfo(TimeSpan Duration, int FirstPgc, int Cells, long Sectors);
+public sealed record TitleInfo(TimeSpan Duration, int FirstPgc, int Cells, long Sectors)
+{
+    /// <summary>Início de cada capítulo, contado desde o começo do título.</summary>
+    public IReadOnlyList<TimeSpan> ChapterStarts { get; init; } = [];
+}
 
 /// <summary>
 /// Lê as tabelas dos arquivos IFO de um DVD-Video. Os IFO nunca são criptografados,
@@ -60,9 +64,11 @@ public static class IfoParser
             : pttTable + lastByte + 1;
 
         var pgcs = new List<int>();
+        var chapters = new List<(int Pgc, int Program)>();
         for (var ptt = start; ptt + 4 <= end; ptt += 4)
         {
             var pgc = ReadUInt16(vts, ptt);
+            chapters.Add((pgc, ReadUInt16(vts, ptt + 2)));
             if (!pgcs.Contains(pgc))
             {
                 pgcs.Add(pgc);
@@ -79,13 +85,15 @@ public static class IfoParser
         var duration = TimeSpan.Zero;
         var cells = 0;
         long sectors = 0;
+        var programStarts = new Dictionary<(int Pgc, int Program), TimeSpan>();
         foreach (var pgc in pgcs.Where(p => p >= 1 && p <= pgcCount))
         {
             var pgcStart = pgcTable + (int)ReadUInt32(vts, pgcTable + 8 + (pgc - 1) * 8 + 4);
-            duration += ParseBcdTime(vts.AsSpan(pgcStart + 4, 4));
 
             var cellCount = vts[pgcStart + 3];
             var cellTable = pgcStart + ReadUInt16(vts, pgcStart + 0xE8);
+            var cellStarts = new TimeSpan[cellCount];
+            var elapsed = duration;
             cells += cellCount;
             for (var c = 0; c < cellCount; c++)
             {
@@ -96,25 +104,57 @@ public static class IfoParser
                 {
                     sectors += last - first + 1;
                 }
+
+                cellStarts[c] = elapsed;
+                if (!IsOtherAngle(vts[cell]))
+                {
+                    elapsed += ParseBcdTime(vts.AsSpan(cell + 4, 4));
+                }
             }
+
+            // Mapa de programas: a célula (base 1) em que cada programa, isto é, cada capítulo, começa.
+            var programCount = vts[pgcStart + 2];
+            var programMap = pgcStart + ReadUInt16(vts, pgcStart + 0xE6);
+            for (var program = 1; program <= programCount; program++)
+            {
+                var entryCell = vts[programMap + program - 1];
+                if (entryCell >= 1 && entryCell <= cellCount)
+                {
+                    programStarts[(pgc, program)] = cellStarts[entryCell - 1];
+                }
+            }
+
+            duration += ParseBcdTime(vts.AsSpan(pgcStart + 4, 4));
         }
 
-        return new TitleInfo(duration, pgcs[0], cells, sectors);
+        var chapterStarts = chapters
+            .Where(programStarts.ContainsKey)
+            .Select(chapter => programStarts[chapter])
+            .ToList();
+
+        return new TitleInfo(duration, pgcs[0], cells, sectors) { ChapterStarts = chapterStarts };
     }
 
-    /// <summary>Tempo no formato do DVD: horas, minutos e segundos em BCD, e quadros com a taxa nos 2 bits altos.</summary>
+    /// <summary>
+    /// Tempo no formato do DVD: horas, minutos e segundos em BCD, e quadros com a taxa nos 2 bits altos.
+    /// No NTSC é um timecode sem drop frame: cada "segundo" tem 30 quadros de 1001/30000 s, então vale 1,001 s
+    /// de verdade. Sem essa correção um título de 1h06 sai quase 4 s curto e os capítulos vão se adiantando.
+    /// </summary>
     internal static TimeSpan ParseBcdTime(ReadOnlySpan<byte> time)
     {
-        var frameRate = (time[3] >> 6) switch
-        {
-            1 => 25.0,
-            3 => 30000.0 / 1001,
-            _ => 0,
-        };
         var frames = Bcd((byte)(time[3] & 0x3F));
         var seconds = Bcd(time[0]) * 3600 + Bcd(time[1]) * 60 + Bcd(time[2]);
-        return TimeSpan.FromSeconds(seconds + (frameRate > 0 ? frames / frameRate : 0));
+        return (time[3] >> 6) switch
+        {
+            1 => TimeSpan.FromSeconds(seconds + frames / 25.0),
+            3 => TimeSpan.FromSeconds((seconds * 30 + frames) * 1001 / 30000.0),
+            _ => TimeSpan.FromSeconds(seconds),
+        };
     }
+
+    /// <summary>Célula de um bloco de ângulos que não é o primeiro ângulo: toca no lugar do primeiro, não depois dele.</summary>
+    private static bool IsOtherAngle(byte category) =>
+        ((category >> 4) & 0x3) == 1 && ((category >> 6) & 0x3) is 2 or 3;
 
     private static int Bcd(byte value) => (value >> 4) * 10 + (value & 0x0F);
 

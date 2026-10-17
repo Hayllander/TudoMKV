@@ -7,12 +7,22 @@ public sealed class MuxJob
 {
     public required MediaSource Source { get; init; }
 
+    public IReadOnlyList<MediaSource> ExtraSources { get; init; } = [];
+
     public required string OutputPath { get; init; }
 
     /// <summary>Faixas a gravar, na ordem em que vão aparecer no MKV.</summary>
     public required IReadOnlyList<MediaTrack> Tracks { get; init; }
 
     public bool KeepChapters { get; init; } = true;
+
+    /// <summary>Entrada que fornece os capítulos quando não vêm da fonte principal.</summary>
+    public int ChaptersSourceIndex { get; init; }
+
+    /// <summary>Arquivos temporários que devem ser apagados depois da gravação.</summary>
+    public IReadOnlyList<string> TemporaryFiles { get; init; } = [];
+
+    public IReadOnlyList<MediaSource> AllSources => [Source, ..ExtraSources];
 
     /// <summary>Pasta padrão para títulos de disco quando o usuário não escolhe outra: Vídeos/TudoMKV.</summary>
     public static string DefaultDiscOutputDirectory
@@ -47,6 +57,7 @@ public sealed class MuxJob
             OutputPath = output,
             Tracks = source.Tracks.Where(t => t.Selected && t.CanMux).ToList(),
             KeepChapters = keepChapters,
+            ChaptersSourceIndex = 0,
         };
     }
 }

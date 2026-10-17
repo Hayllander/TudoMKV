@@ -61,6 +61,7 @@ public sealed class BlurayReader(FfprobeInspector inspector) : IDiscReader
             InputArguments = ["-f", "concat", "-safe", "0"],
             ChaptersFile = chapters,
             Name = $"{disc.Label} · Título {number}",
+            TitleNumber = number,
             OutputBaseName = $"{DiscTracks.SafeFileName(disc.Label)}_t{number:00}",
             IsDisc = true,
             FormatName = "bluray",
@@ -111,27 +112,11 @@ public sealed class BlurayReader(FfprobeInspector inspector) : IDiscReader
         return builder.ToString();
     }
 
-    internal static string BuildChapters(Playlist playlist)
-    {
-        var builder = new StringBuilder(";FFMETADATA1\n");
-        var total = (long)(playlist.Duration * 1000);
-        for (var i = 0; i < playlist.Chapters.Count; i++)
-        {
-            var start = (long)(playlist.Chapters[i] * 1000);
-            var end = i + 1 < playlist.Chapters.Count ? (long)(playlist.Chapters[i + 1] * 1000) : total;
-            if (end <= start)
-            {
-                continue;
-            }
-
-            builder.Append(CultureInfo.InvariantCulture, $"[CHAPTER]\nTIMEBASE=1/1000\nSTART={start}\nEND={end}\ntitle=Capítulo {i + 1:00}\n");
-        }
-
-        return builder.ToString();
-    }
+    internal static string BuildChapters(Playlist playlist) =>
+        DiscTracks.BuildChapters(playlist.Chapters.Select(TimeSpan.FromSeconds).ToList(), TimeSpan.FromSeconds(playlist.Duration));
 
     /// <summary>Pasta temporária por disco para as listas de concatenação e capítulos.</summary>
-    private static string WorkDirectory(string root)
+    internal static string WorkDirectory(string root)
     {
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(root))))[..12];
         var directory = Path.Combine(Path.GetTempPath(), "TudoMKV", hash);

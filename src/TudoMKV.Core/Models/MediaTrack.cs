@@ -12,6 +12,9 @@ public enum TrackType
 /// <summary>Uma faixa (stream) de um arquivo ou título de disco.</summary>
 public sealed class MediaTrack
 {
+    /// <summary>Índice da entrada do ffmpeg a que esta faixa pertence.</summary>
+    public int InputIndex { get; init; }
+
     /// <summary>Índice do stream na origem, como o FFmpeg o numera.</summary>
     public required int Index { get; init; }
 

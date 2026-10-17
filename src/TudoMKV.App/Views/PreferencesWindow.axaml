@@ -1,0 +1,46 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TudoMKV.App.Views.PreferencesWindow"
+        Title="Preferências do TudoMKV"
+        Width="560" Height="320"
+        MinWidth="520" MinHeight="280"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="*,Auto" Margin="14">
+    <TabControl>
+      <TabItem Header="Integration">
+        <Border Padding="14">
+          <Grid RowDefinitions="Auto,18,Auto,12,Auto,10,Auto,*">
+            <TextBlock Text="O TudoMKV pode fazer integração com algumas API disponíveis para melhorar as informações do MKV. Informe abaixo a API de sua preferência."
+                       TextWrapping="Wrap" />
+
+            <Grid Grid.Row="2" ColumnDefinitions="150,*" VerticalAlignment="Center">
+              <TextBlock Text="API escolhida:" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <ComboBox x:Name="ProviderCombo" Grid.Column="1" SelectedIndex="0">
+                <ComboBoxItem Content="Nenhuma" />
+                <ComboBoxItem Content="OMDb (IMDb)" />
+              </ComboBox>
+            </Grid>
+
+            <Grid Grid.Row="4" ColumnDefinitions="150,*" VerticalAlignment="Center">
+              <TextBlock Text="Dados da API:" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <TextBox x:Name="ApiDataBox" Grid.Column="1" PlaceholderText="Ex.: chave da API OMDb" />
+            </Grid>
+
+            <TextBlock Grid.Row="6"
+                       Text="Observação: o OMDb usa a chave de API para buscar metadados do filme. O código IMDb do título ainda será definido no fluxo de integração."
+                       TextWrapping="Wrap"
+                       Opacity="0.7" />
+          </Grid>
+        </Border>
+      </TabItem>
+    </TabControl>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,14,0,0">
+      <Button Content="OK" MinWidth="90" Click="OnOkClick" />
+      <Button Content="Cancelar" MinWidth="90" Click="OnCancelClick" />
+      <Button Content="Apply" MinWidth="90" Click="OnApplyClick" />
+    </StackPanel>
+  </Grid>
+</Window>

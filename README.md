@@ -12,7 +12,10 @@ Títulos com menos de 2 minutos são pulados e o log diz por quê. O MKV sai sem
 
 ## Download (Windows)
 
-Baixe o `TudoMKV-<versão>-win-x64.zip` em [Releases](../../releases), extraia e abra `TudoMKV.exe`. O .NET e o FFmpeg já vêm dentro.
+Em [Releases](../../releases) há duas opções, com o .NET e o FFmpeg já dentro:
+
+- `TudoMKV-<versão>-setup.exe`: instala em `%LOCALAPPDATA%\Programs\TudoMKV`, com atalho no Menu Iniciar e desinstalação em Aplicativos e recursos. Não pede administrador.
+- `TudoMKV-<versão>-win-x64.zip`: versão portátil; extraia a pasta e abra `TudoMKV.exe`.
 
 ## Requisitos
 
@@ -42,10 +45,11 @@ Os testes de integração geram um MP4 de amostra, um DVD de teste (com `dvdauth
 ## Gerar o executável para Windows
 
 ```sh
-build/package-windows.sh 0.4.0
+build/package-windows.sh 0.4.6          # zip portátil (Linux ou Git Bash)
+build/package-installer.ps1 -Version 0.4.6   # instalador (PowerShell, só no Windows)
 ```
 
-Gera `dist/TudoMKV-0.4.0-win-x64.zip` com o app autocontido e o FFmpeg da BtbN. Roda em Linux ou no Git Bash do Windows. Ao enviar uma tag `v*`, o workflow `Release` faz isso e publica a release.
+O `package-windows.sh` gera `dist/TudoMKV-0.4.6-win-x64.zip`, com o app autocontido e o FFmpeg da BtbN. O `package-installer.ps1` gera `dist/TudoMKV-0.4.6-setup.exe` com o IExpress — por isso roda apenas no Windows — empacotando o mesmo conteúdo mais os scripts de instalação. Ao enviar uma tag `v*`, o workflow `Release` gera os dois e anexa ambos à release.
 
 ## Estrutura
 
@@ -64,7 +68,7 @@ Gera `dist/TudoMKV-0.4.0-win-x64.zip` com o app autocontido e o FFmpeg da BtbN. 
 3. **Blu-ray** (feito): playlists lidas em C#, gravação pela concatenação dos .m2ts (o protocolo `bluray:` do FFmpeg recusa playlists com menos de 3 minutos).
 4. Metadados: modelos de nome de arquivo, perfis de idioma, mkvpropedit opcional.
 5. Detecção de bibliotecas opcionais instaladas pelo usuário.
-6. Instalador e builds para Linux e macOS.
+6. Instalador (feito, Windows) e builds para Linux e macOS.
 
 ## Aviso legal
 

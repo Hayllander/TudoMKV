@@ -2,19 +2,33 @@ using System.Collections.Specialized;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
+using TudoMKV.App.Integration;
 using TudoMKV.App.ViewModels;
 
 namespace TudoMKV.App.Views;
 
 public partial class MainWindow : Window
 {
-    private static readonly FilePickerFileType DiscAndVideoFiles = new("Discos e vídeos")
+    private static readonly FilePickerFileType DiscEntryFiles = new("Arquivos de disco")
     {
         Patterns =
         [
-            "*.IFO", "*.ifo", "*.bdmv", "*.BDMV", "*.iso", "*.ISO", "*.img", "*.IMG",
+            "VIDEO_TS.IFO", "VIDEO_TS.ifo",
+            "index.bdmv", "INDEX.BDMV",
+            "MovieObject.bdmv", "MOVIEOBJECT.BDMV",
+            "*.iso", "*.ISO", "*.img", "*.IMG",
+        ],
+    };
+
+    private static readonly FilePickerFileType VideoFiles = new("Arquivos de vídeo")
+    {
+        Patterns =
+        [
             "*.mkv", "*.mp4", "*.m4v", "*.mov", "*.m2ts", "*.mts", "*.ts", "*.vob", "*.avi", "*.webm", "*.mpg", "*.mpeg",
         ],
     };
@@ -24,6 +38,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
+        ActualThemeVariantChanged += (_, _) => UpdateThemeIcon();
         DataContextChanged += (_, _) =>
         {
             if (DataContext is MainWindowViewModel vm)
@@ -31,6 +46,7 @@ public partial class MainWindow : Window
                 vm.Log.CollectionChanged += OnLogChanged;
             }
         };
+        UpdateThemeIcon();
     }
 
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext!;
@@ -50,9 +66,9 @@ public partial class MainWindow : Window
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Abrir: VIDEO_TS.IFO, index.bdmv, MovieObject.bdmv, ISO ou vídeos",
+            Title = "Abrir: VIDEO_TS.IFO, index.bdmv, MovieObject.bdmv, ISO, IMG ou vídeos",
             AllowMultiple = true,
-            FileTypeFilter = [DiscAndVideoFiles, FilePickerFileTypes.All],
+            FileTypeFilter = [DiscEntryFiles, VideoFiles, FilePickerFileTypes.All],
         });
 
         await ViewModel.OpenAsync(LocalPaths(files));
@@ -123,6 +139,22 @@ public partial class MainWindow : Window
 
     private void OnExitClick(object? sender, RoutedEventArgs e) => Close();
 
+    private void OnToggleThemeClick(object? sender, RoutedEventArgs e)
+    {
+        RequestedThemeVariant = ActualThemeVariant == ThemeVariant.Dark ? ThemeVariant.Light : ThemeVariant.Dark;
+        UpdateThemeIcon();
+    }
+
+    /// <summary>No tema escuro o botão mostra o sol (ir para o claro); no claro, a lua.</summary>
+    private void UpdateThemeIcon()
+    {
+        var key = ActualThemeVariant == ThemeVariant.Dark ? "IconSun" : "IconMoon";
+        if (this.TryFindResource(key, out var icon) && icon is StreamGeometry geometry)
+        {
+            ThemeIcon.Data = geometry;
+        }
+    }
+
     private async void OnAboutClick(object? sender, RoutedEventArgs e)
     {
         var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "";
@@ -141,6 +173,29 @@ public partial class MainWindow : Window
                        "Não contorna proteções contra cópia (CSS, AACS).\n\nLicença GPLv3.",
             },
         };
+        await dialog.ShowDialog(this);
+    }
+
+    private async void OnPreferencesClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new PreferencesWindow();
+        await dialog.ShowDialog<bool?>(this);
+    }
+
+    private async void OnVerifyImdbClick(object? sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.VerifyImdbCommand.CanExecute(null))
+        {
+            return;
+        }
+
+        await ViewModel.VerifyImdbCommand.ExecuteAsync(null);
+        if (ViewModel.LastVerifiedMovie is not { } movie)
+        {
+            return;
+        }
+
+        var dialog = new ImdbInfoWindow(movie);
         await dialog.ShowDialog(this);
     }
 

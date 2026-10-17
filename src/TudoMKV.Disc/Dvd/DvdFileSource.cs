@@ -8,6 +8,9 @@ public interface IDvdFileSource : IDisposable
 {
     string? VolumeLabel { get; }
 
+    /// <summary>Caminho que o ffmpeg deve abrir (a ISO, a pasta que contém VIDEO_TS ou a junção para uma ISO montada).</summary>
+    string InputPath { get; }
+
     /// <summary>Lê um arquivo de VIDEO_TS (ex.: "VTS_01_0.IFO"), ou null se não existir.</summary>
     byte[]? ReadVideoTsFile(string name);
 }
@@ -17,17 +20,19 @@ public sealed class FolderDvdSource : IDvdFileSource
 {
     private readonly string _videoTs;
 
-    public FolderDvdSource(string videoTsDirectory, string? volumeLabel)
+    public FolderDvdSource(string videoTsDirectory, string rootPath, string? volumeLabel)
     {
         _videoTs = videoTsDirectory;
+        InputPath = rootPath;
         VolumeLabel = volumeLabel;
     }
 
     public string? VolumeLabel { get; }
 
+    public string InputPath { get; }
+
     public byte[]? ReadVideoTsFile(string name)
     {
-        // Discos e cópias podem ter nomes em minúsculas; no Linux isso importa.
         var match = Directory.EnumerateFiles(_videoTs)
             .FirstOrDefault(f => string.Equals(Path.GetFileName(f), name, StringComparison.OrdinalIgnoreCase));
         return match is null ? null : File.ReadAllBytes(match);
@@ -38,7 +43,10 @@ public sealed class FolderDvdSource : IDvdFileSource
     }
 }
 
-/// <summary>Leitor mínimo de ISO 9660, suficiente para achar VIDEO_TS numa imagem de DVD (ponte UDF/ISO).</summary>
+/// <summary>
+/// Leitor mínimo de ISO 9660, suficiente para achar VIDEO_TS numa imagem de DVD (ponte UDF/ISO).
+/// Também aceita imagens com VIDEO_TS.IFO, VTS_XX_Y.IFO etc. direto na raiz (sem a pasta VIDEO_TS).
+/// </summary>
 public sealed class IsoDvdSource : IDvdFileSource
 {
     private const int SectorSize = 2048;
@@ -59,13 +67,26 @@ public sealed class IsoDvdSource : IDvdFileSource
             }
 
             VolumeLabel = Encoding.ASCII.GetString(pvd, 40, 32).Trim();
-            var root = ReadDirectory(ParseRecord(pvd, 156).Sector, ParseRecord(pvd, 156).Size);
-            if (!root.TryGetValue("VIDEO_TS", out var videoTs) || !videoTs.IsDirectory)
+            var rootRecord = ParseRecord(pvd, 156);
+            var root = ReadDirectory(rootRecord.Sector, rootRecord.Size);
+
+            Dictionary<string, Record> files;
+            if (root.TryGetValue("VIDEO_TS", out var videoTs) && videoTs.IsDirectory)
+            {
+                files = ReadDirectory(videoTs.Sector, videoTs.Size);
+                InputPath = isoPath;
+            }
+            else if (root.TryGetValue("VIDEO_TS.IFO", out var ifo) && !ifo.IsDirectory)
+            {
+                files = root;
+                InputPath = RootFilesInputPath(isoPath);
+            }
+            else
             {
                 throw new InvalidDataException("A imagem não contém a pasta VIDEO_TS.");
             }
 
-            _videoTsFiles = ReadDirectory(videoTs.Sector, videoTs.Size)
+            _videoTsFiles = files
                 .Where(e => !e.Value.IsDirectory)
                 .ToDictionary(e => e.Key, e => (e.Value.Sector, e.Value.Size), StringComparer.OrdinalIgnoreCase);
         }
@@ -77,6 +98,8 @@ public sealed class IsoDvdSource : IDvdFileSource
     }
 
     public string? VolumeLabel { get; }
+
+    public string InputPath { get; }
 
     public byte[]? ReadVideoTsFile(string name)
     {
@@ -93,6 +116,28 @@ public sealed class IsoDvdSource : IDvdFileSource
 
     public void Dispose() => _stream.Dispose();
 
+    /// <summary>
+    /// O demuxer dvdvideo do ffmpeg (libdvdread) só acha os arquivos numa ISO dentro de /VIDEO_TS (via UDF),
+    /// mas numa pasta comum também os procura na raiz. No Windows a ISO é montada e o ffmpeg abre essa pasta.
+    /// </summary>
+    private static string RootFilesInputPath(string isoPath)
+    {
+        const string hint = "Extraia o conteúdo da ISO para uma pasta VIDEO_TS e abra essa pasta.";
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new InvalidDataException($"Esta ISO tem os arquivos do DVD na raiz, sem a pasta VIDEO_TS, e o ffmpeg não a abre. {hint}");
+        }
+
+        try
+        {
+            return IsoMount.Open(isoPath);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidDataException($"Esta ISO tem os arquivos do DVD na raiz, sem a pasta VIDEO_TS, e {ex.Message}. {hint}", ex);
+        }
+    }
+
     private Dictionary<string, Record> ReadDirectory(long sector, long size)
     {
         var data = ReadSectors(sector, (int)((size + SectorSize - 1) / SectorSize));
@@ -103,7 +148,6 @@ public sealed class IsoDvdSource : IDvdFileSource
             var length = data[offset];
             if (length == 0)
             {
-                // Registros não atravessam setores; pula para o próximo.
                 offset = (offset / SectorSize + 1) * SectorSize;
                 continue;
             }

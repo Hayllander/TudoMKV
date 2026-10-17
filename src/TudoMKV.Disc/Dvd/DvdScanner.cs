@@ -2,7 +2,11 @@ using TudoMKV.Disc.Bluray;
 
 namespace TudoMKV.Disc.Dvd;
 
-public sealed record DvdTitle(int Number, TimeSpan Duration, int Chapters, int Angles, int TitleSet, int Pgc, int Cells, long SizeBytes);
+public sealed record DvdTitle(int Number, TimeSpan Duration, int Chapters, int Angles, int TitleSet, int Pgc, int Cells, long SizeBytes)
+{
+    /// <summary>Início de cada capítulo pelos IFO, contado desde o começo do título.</summary>
+    public IReadOnlyList<TimeSpan> ChapterStarts { get; init; } = [];
+}
 
 /// <summary>Um título que não entrou na lista, e por quê (para o log).</summary>
 public sealed record DvdSkip(int Number, string Reason);
@@ -70,10 +74,13 @@ public static class DvdScanner
                     continue;
                 }
 
-                titles.Add(new DvdTitle(title.Number, info.Duration, title.Chapters, title.Angles, title.TitleSet, info.FirstPgc, info.Cells, info.Sectors * 2048));
+                titles.Add(new DvdTitle(title.Number, info.Duration, title.Chapters, title.Angles, title.TitleSet, info.FirstPgc, info.Cells, info.Sectors * 2048)
+                {
+                    ChapterStarts = info.ChapterStarts,
+                });
             }
 
-            var label = string.IsNullOrWhiteSpace(source.VolumeLabel) ? fallbackLabel : source.VolumeLabel!;
+            var label = IsMeaningfulLabel(source.VolumeLabel) ? source.VolumeLabel! : fallbackLabel;
             return new DvdDisc(label, inputPath, titles, skipped);
         }
     }
@@ -82,7 +89,8 @@ public static class DvdScanner
     {
         if (IsIso(path))
         {
-            return (new IsoDvdSource(path), path, Path.GetFileNameWithoutExtension(path));
+            var source = new IsoDvdSource(path);
+            return (source, source.InputPath, Path.GetFileNameWithoutExtension(path));
         }
 
         if (IsIfo(path))
@@ -97,8 +105,16 @@ public static class DvdScanner
         var root = Path.GetDirectoryName(videoTs)!;
         var driveLabel = BlurayScanner.DriveLabel(root);
         var label = driveLabel ?? new DirectoryInfo(root).Name;
-        return (new FolderDvdSource(videoTs, driveLabel), root, label);
+        var folderSource = new FolderDvdSource(videoTs, root, driveLabel);
+        return (folderSource, folderSource.InputPath, label);
     }
+
+    /// <summary>
+    /// Rótulos vazios ou só com números (ex.: "20110204_1906", a data que alguns programas gravam como
+    /// rótulo da ISO) não dizem nada; nesse caso vale o nome do arquivo ou da pasta.
+    /// </summary>
+    internal static bool IsMeaningfulLabel(string? label) =>
+        !string.IsNullOrWhiteSpace(label) && label.Any(char.IsLetter);
 
     private static bool IsIso(string path) =>
         File.Exists(path) && (path.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)

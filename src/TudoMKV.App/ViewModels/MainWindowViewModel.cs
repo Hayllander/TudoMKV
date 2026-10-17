@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using TudoMKV.App.Integration;
 using TudoMKV.Core;
 using TudoMKV.Core.Models;
+using TudoMKV.Disc.Dvd;
 using TudoMKV.Muxing;
 
 namespace TudoMKV.App.ViewModels;
@@ -15,13 +18,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly SourceOpener _opener;
     private readonly IMuxer _muxer;
+    private readonly SelectionMuxJobBuilder _jobBuilder;
+    private readonly OmdbMetadataService _omdbMetadata;
+    private readonly TagFileService _tagFileService;
+    private readonly MkvTagWriter _mkvTagWriter;
     private readonly List<(MediaSource Source, TreeNodeViewModel Title, TreeNodeViewModel? Chapters)> _titles = [];
     private CancellationTokenSource? _cancellation;
 
-    public MainWindowViewModel(SourceOpener opener, IMuxer muxer)
+    public MainWindowViewModel(SourceOpener opener, IMuxer muxer, SelectionMuxJobBuilder jobBuilder, OmdbMetadataService omdbMetadata, TagFileService tagFileService, MkvTagWriter mkvTagWriter)
     {
         _opener = opener;
         _muxer = muxer;
+        _jobBuilder = jobBuilder;
+        _omdbMetadata = omdbMetadata;
+        _tagFileService = tagFileService;
+        _mkvTagWriter = mkvTagWriter;
         Log.CollectionChanged += (_, _) => OnPropertyChanged(nameof(LogText));
     }
 
@@ -35,13 +46,41 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string LogText => string.Join(Environment.NewLine, Log);
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(InfoText))]
+    [NotifyPropertyChangedFor(nameof(InfoText), nameof(InfoHeader), nameof(InfoRows), nameof(InfoHint))]
     public partial TreeNodeViewModel? SelectedNode { get; set; }
 
     public string InfoText => SelectedNode?.Info
         ?? "Abra um disco ou arquivo pelo menu Arquivo, pelos botões acima ou arrastando para esta janela.\n\n" +
-           "DVD: escolha o VIDEO_TS.IFO (ou a pasta VIDEO_TS).\n" +
+           "DVD: escolha o VIDEO_TS.IFO. A pasta VIDEO_TS também funciona, mas o fluxo principal é pelo IFO.\n" +
            "Blu-ray: escolha o index.bdmv ou o MovieObject.bdmv dentro da pasta BDMV.";
+
+    /// <summary>Primeira linha das informações ("Informações do Título"), mostrada como cabeçalho.</summary>
+    public string InfoHeader => SelectedNode is null ? "Como começar" : InfoText.Split('\n')[0];
+
+    /// <summary>As linhas "Nome: valor" das informações, para mostrar em duas colunas.</summary>
+    public IReadOnlyList<InfoRow> InfoRows => SelectedNode is null
+        ? []
+        : InfoText.Split('\n').Skip(1).Select(InfoRow.Parse).ToList();
+
+    /// <summary>Texto livre quando não há nada selecionado.</summary>
+    public string? InfoHint => SelectedNode is null ? InfoText : null;
+
+    /// <summary>"2 títulos · 4.1 GB", abaixo do botão Make MKV.</summary>
+    public string SelectionSummary
+    {
+        get
+        {
+            var chosen = _titles.Where(t => t.Title.IsChecked).Select(t => t.Source).ToList();
+            if (chosen.Count == 0)
+            {
+                return _titles.Count == 0 ? "Nada aberto" : "Nenhum título marcado";
+            }
+
+            var size = Describe.Size(chosen.Sum(s => s.SizeBytes));
+            var titles = Describe.Plural(chosen.Count, "título", "títulos");
+            return size.Length > 0 ? $"{titles}  ·  {size}" : titles;
+        }
+    }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(MakeMkvCommand))]
@@ -50,6 +89,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(MakeMkvCommand))]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
+    [NotifyCanExecuteChangedFor(nameof(VerifyImdbCommand))]
     public partial bool IsBusy { get; set; }
 
     public bool IsIdle => !IsBusy;
@@ -63,6 +103,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     public partial string StatusText { get; set; } = "Pronto";
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(VerifyImdbCommand))]
+    public partial string? ImdbReference { get; set; }
+
+    public OmdbMovieInfo? LastVerifiedMovie { get; private set; }
+
     public async Task OpenAsync(IReadOnlyList<string> paths)
     {
         if (paths.Count == 0 || IsBusy)
@@ -72,6 +118,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         IsBusy = true;
         StatusText = "Lendo…";
+
+        // A origem anterior sai da tela; libera as ISOs que montamos para ela.
+        IsoMount.ReleaseAll();
+
         try
         {
             var contents = await _opener.OpenAsync(paths, MinimumTitleLength);
@@ -80,8 +130,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 AddLog(message);
             }
 
-            Show(contents);
-            OutputDirectory = DefaultOutputDirectory(contents, paths);
+            // Nada aproveitável entre arquivos soltos: não mostra uma origem vazia nem troca a pasta de saída.
+            if (contents.Kind != SourceKind.Files || contents.Titles.Count > 0)
+            {
+                Show(contents);
+                OutputDirectory = DefaultOutputDirectory(contents, paths);
+            }
             AddLog(contents.Titles.Count > 0 ? "Operação finalizada com sucesso" : "Nenhum título encontrado");
         }
         catch (Exception ex) when (ex is MuxException or IOException or InvalidDataException or UnauthorizedAccessException)
@@ -96,8 +150,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             IsBusy = false;
             StatusText = "Pronto";
-            MakeMkvCommand.NotifyCanExecuteChanged();
+            SelectionChanged();
         }
+    }
+
+    private void SelectionChanged()
+    {
+        MakeMkvCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(SelectionSummary));
     }
 
     private void Show(DiscContents contents)
@@ -106,15 +166,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _titles.Clear();
 
         var root = new TreeNodeViewModel(
-            NodeKind.Source, 0, Describe.KindName(contents.Kind), contents.Label,
+            NodeKind.Source, 0, Describe.KindName(contents.Kind),
+            $"{contents.Label}  ·  {Describe.Plural(contents.Titles.Count, "título", "títulos")}",
             $"Informações da Origem\nTipo: {Describe.KindName(contents.Kind)}\nNome: {contents.Label}\nTítulos: {contents.Titles.Count}");
 
         foreach (var source in contents.Titles)
         {
-            var label = contents.Kind == SourceKind.Files ? source.DisplayName : contents.Label;
             var title = new TreeNodeViewModel(
-                NodeKind.Title, 1, "Título", Describe.Title(source, label), TitleInfo(source),
-                isChecked: true, onChecked: _ => MakeMkvCommand.NotifyCanExecuteChanged())
+                NodeKind.Title, 1, Describe.TitleType(source), Describe.Title(source), TitleInfo(source),
+                isChecked: true, onChecked: _ => SelectionChanged())
             {
                 Title = source,
             };
@@ -133,7 +193,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (source.ChapterCount > 0)
             {
                 chapters = new TreeNodeViewModel(
-                    NodeKind.Chapters, 2, "Capítulos", $"{source.ChapterCount} capítulo(s)",
+                    NodeKind.Chapters, 2, "Capítulos", Describe.Plural(source.ChapterCount, "capítulo", "capítulos"),
                     $"Capítulos\nO MKV leva {source.ChapterCount} marcadores de capítulo.", isChecked: true)
                 {
                     Title = source,
@@ -215,6 +275,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool CanMakeMkv() =>
         !IsBusy && !string.IsNullOrWhiteSpace(OutputDirectory) && _titles.Any(t => t.Title.IsChecked);
 
+    private bool CanVerifyImdb() =>
+        !IsBusy && !string.IsNullOrWhiteSpace(ImdbReference);
+
+    [RelayCommand(CanExecute = nameof(CanVerifyImdb))]
+    private async Task VerifyImdbAsync()
+    {
+        IsBusy = true;
+        StatusText = "Consultando OMDb…";
+        LastVerifiedMovie = null;
+        try
+        {
+            var movie = await _omdbMetadata.FetchAsync(ImdbReference!);
+            _tagFileService.UpdateFromOmdb(movie);
+            LastVerifiedMovie = movie;
+            AddLog($"IMDb {movie.ImdbId}: tags atualizadas em {Path.GetFileName(_tagFileService.TagsPath)}");
+            AddLog($"Título: {movie.Title} ({movie.Year})");
+            StatusText = "Tags atualizadas";
+        }
+        catch (Exception ex)
+        {
+            AddLog($"Falha ao consultar IMDb/OMDb: {ex.Message}");
+            StatusText = "Erro na consulta";
+        }
+        finally
+        {
+            IsBusy = false;
+            if (StatusText != "Erro na consulta")
+            {
+                StatusText = "Pronto";
+            }
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanMakeMkv))]
     private async Task MakeMkvAsync()
     {
@@ -228,7 +321,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             for (var i = 0; i < selected.Count; i++)
             {
                 var (source, _, chapters) = selected[i];
-                var job = MuxJob.FromSelection(source, OutputDirectory, keepChapters: chapters?.IsChecked ?? true);
+                var job = await _jobBuilder.CreateAsync(
+                    source,
+                    OutputDirectory,
+                    keepChapters: chapters?.IsChecked ?? true,
+                    _cancellation.Token);
                 if (job.Tracks.Count == 0)
                 {
                     AddLog($"{source.DisplayName}: nenhuma faixa marcada, título ignorado.");
@@ -238,17 +335,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 var index = i;
                 StatusText = $"Gravando título {index + 1} de {selected.Count}: {Path.GetFileName(job.OutputPath)}";
                 AddLog($"Gravando {job.OutputPath}");
+                if (job.ExtraSources.Count > 0 && job.ChaptersSourceIndex > 0)
+                {
+                    AddLog($"{source.DisplayName}: usando VOBs físicos para vídeo/áudio e dvdvideo para legendas/capítulos.");
+                }
                 var progress = new Progress<double>(fraction =>
                     Progress = (index + fraction) / selected.Count * 100);
 
-                await _muxer.MuxAsync(job, progress, _cancellation.Token);
-                done++;
-                AddLog($"Título gravado: {Path.GetFileName(job.OutputPath)}");
+                try
+                {
+                    await _muxer.MuxAsync(job, progress, _cancellation.Token);
+                    await TryApplyTagsAsync(job.OutputPath, _cancellation.Token);
+                    done++;
+                    AddLog($"Título gravado: {Path.GetFileName(job.OutputPath)}");
+                }
+                finally
+                {
+                    CleanupTemporaryFiles(job.TemporaryFiles);
+                }
             }
 
             Progress = 100;
             AddLog($"{done} título(s) gravado(s) com sucesso em {OutputDirectory}");
             StatusText = "Concluído";
+
+            if (done > 0)
+            {
+                OpenOutputFolder(OutputDirectory);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -277,5 +391,77 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void Cancel() => _cancellation?.Cancel();
 
+    [RelayCommand]
+    private void ClearLog() => Log.Clear();
+
+    private async Task TryApplyTagsAsync(string outputPath, CancellationToken cancellationToken)
+    {
+        var tagsPath = _tagFileService.TagsPath;
+        if (!File.Exists(tagsPath))
+        {
+            return;
+        }
+
+        try
+        {
+            await _mkvTagWriter.ApplyGlobalTagsAsync(outputPath, tagsPath, cancellationToken);
+            AddLog($"Tags globais aplicadas: {Path.GetFileName(tagsPath)}");
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or IOException or MuxException)
+        {
+            AddLog($"Aviso: não foi possível aplicar as tags globais no MKV: {ex.Message}");
+            if (ex is MuxException { Log: { Length: > 0 } log })
+            {
+                AddLog(log);
+            }
+        }
+    }
+
+    /// <summary>Abre a pasta dos MKVs no Explorer. Falhar nisso não pode invalidar a gravação.</summary>
+    private void OpenOutputFolder(string? folder)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        {
+            return;
+        }
+
+        try
+        {
+            var process = Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+            process?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            AddLog($"Aviso: não foi possível abrir a pasta no Explorer: {ex.Message}");
+        }
+    }
+
     private void AddLog(string message) => Log.Add(message);
+
+    private void CleanupTemporaryFiles(IReadOnlyList<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+}
+
+/// <summary>Uma linha "Nome: valor" do painel de informações.</summary>
+public sealed record InfoRow(string Name, string Value)
+{
+    public static InfoRow Parse(string line)
+    {
+        var colon = line.IndexOf(": ", StringComparison.Ordinal);
+        return colon < 0 ? new InfoRow(line, "") : new InfoRow(line[..colon], line[(colon + 2)..]);
+    }
 }

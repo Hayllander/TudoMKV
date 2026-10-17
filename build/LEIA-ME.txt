@@ -3,8 +3,9 @@ TudoMKV
 
 Como usar
 ---------
-1. Extraia esta pasta inteira em qualquer lugar (ex.: C:\Programas\TudoMKV).
-2. Abra TudoMKV.exe. Não precisa instalar o .NET; ele já vem embutido.
+1. No kit instalado, abra pelo atalho do Menu Iniciar. Na versão portátil, extraia esta
+   pasta inteira em qualquer lugar (ex.: C:\Programas\TudoMKV) e abra o TudoMKV.exe.
+2. Não precisa instalar o .NET nem o FFmpeg: os dois já vêm embutidos.
 3. Em Arquivo > Abrir arquivo, escolha:
    - DVD: o VIDEO_TS.IFO
    - Blu-ray: o index.bdmv ou o MovieObject.bdmv (dentro da pasta BDMV)
