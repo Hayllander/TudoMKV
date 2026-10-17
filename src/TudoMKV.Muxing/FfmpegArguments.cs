@@ -54,15 +54,38 @@ public static class FfmpegArguments
             chapterInputIndexes[i] = nextInputIndex++;
         }
 
-        foreach (var track in job.Tracks)
+        // As faixas geradas (ex.: o estéreo de um áudio mono) saem de um filtro e não podem ser copiadas.
+        var filters = new List<string>();
+        var maps = new List<string>(job.Tracks.Count);
+        for (var output = 0; output < job.Tracks.Count; output++)
         {
+            var track = job.Tracks[output];
             if (track.InputIndex < 0 || track.InputIndex >= sources.Count)
             {
                 throw new ArgumentOutOfRangeException(nameof(job), "Uma faixa aponta para uma origem inexistente.");
             }
 
-            args.Add("-map");
-            args.Add($"{mediaInputIndexes[track.InputIndex]}:{track.Index}");
+            var input = $"{mediaInputIndexes[track.InputIndex]}:{track.Index}";
+            if (track.Conversion is { } conversion)
+            {
+                var label = $"conv{output}";
+                filters.Add($"[{input}]{conversion.Filter}[{label}]");
+                maps.Add($"[{label}]");
+            }
+            else
+            {
+                maps.Add(input);
+            }
+        }
+
+        if (filters.Count > 0)
+        {
+            args.AddRange(["-filter_complex", string.Join(';', filters)]);
+        }
+
+        foreach (var map in maps)
+        {
+            args.AddRange(["-map", map]);
         }
 
         var chaptersInput = chapterInputIndexes.TryGetValue(job.ChaptersSourceIndex, out var chaptersFileInput)
@@ -77,7 +100,12 @@ public static class FfmpegArguments
         {
             var track = job.Tracks[output];
 
-            if (track.Type == TrackType.Subtitle && SubtitleConversions.TryGetValue(track.Codec, out var target))
+            if (track.Conversion is { } conversion)
+            {
+                args.AddRange([$"-c:{output}", conversion.Codec]);
+                args.AddRange([$"-b:{output}", $"{conversion.BitRateKbps}k"]);
+            }
+            else if (track.Type == TrackType.Subtitle && SubtitleConversions.TryGetValue(track.Codec, out var target))
             {
                 args.AddRange([$"-c:{output}", target]);
             }

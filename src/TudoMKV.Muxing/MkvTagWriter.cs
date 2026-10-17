@@ -8,7 +8,12 @@ public sealed class MkvTagWriter(string? mkvpropeditPath = null)
 {
     private const int MaxLogLines = 40;
 
-    public async Task ApplyGlobalTagsAsync(string mkvPath, string tagsPath, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Aplica as etiquetas globais do Matroska em um MKV pronto. O mkvpropedit só lê etiquetas de um arquivo,
+    /// então elas passam por um temporário na pasta do sistema, apagado logo depois: a pasta do aplicativo
+    /// (ou da instalação) nunca recebe um tags.xml para ficar por lá.
+    /// </summary>
+    public async Task ApplyGlobalTagsAsync(string mkvPath, string tagsXml, CancellationToken cancellationToken = default)
     {
         var toolPath = mkvpropeditPath ?? ToolLocator.Find("mkvpropedit");
         if (string.IsNullOrWhiteSpace(toolPath))
@@ -16,6 +21,22 @@ public sealed class MkvTagWriter(string? mkvpropeditPath = null)
             throw new FileNotFoundException("Não encontrei o mkvpropedit. Instale o MKVToolNix ou coloque o executável no PATH.");
         }
 
+        var tagsPath = Path.Combine(Path.GetTempPath(), "TudoMKV", $"tags-{Guid.NewGuid():N}.xml");
+        Directory.CreateDirectory(Path.GetDirectoryName(tagsPath)!);
+        await File.WriteAllTextAsync(tagsPath, tagsXml, cancellationToken);
+
+        try
+        {
+            await RunAsync(toolPath, mkvPath, tagsPath, cancellationToken);
+        }
+        finally
+        {
+            TryDelete(tagsPath);
+        }
+    }
+
+    private static async Task RunAsync(string toolPath, string mkvPath, string tagsPath, CancellationToken cancellationToken)
+    {
         var startInfo = new ProcessStartInfo(toolPath)
         {
             RedirectStandardOutput = true,
@@ -77,6 +98,18 @@ public sealed class MkvTagWriter(string? mkvpropeditPath = null)
             }
         }
         catch (InvalidOperationException)
+        {
+        }
+    }
+
+    /// <summary>Um temporário que não pôde ser apagado não pode invalidar a gravação das etiquetas.</summary>
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
         }
     }

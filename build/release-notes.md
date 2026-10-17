@@ -10,16 +10,12 @@ Funciona como o MakeMKV: em Arquivo > Abrir arquivo, escolha o `VIDEO_TS.IFO` (D
 
 O MKV sai marcado como gravado pelo TudoMKV, com a data, os nomes das faixas de áudio (Stereo, Surround 5.1…) e o ID de cada faixa no disco de origem, como o MediaInfo mostra nos arquivos do MakeMKV.
 
-Novidades desta versão (desde a v0.4.1)
+Novidades desta versão (desde a v0.4.6)
 ---------------------------------------
 
-- **DVD danificado**: quando o demuxer de DVD do FFmpeg estraga o vídeo, o título passa a ser montado pelos VOBs físicos do disco (vídeo e áudio), ficando as legendas e os capítulos com o IFO. Era o caso do *Dog and Wolf*, que saía com quadros corrompidos.
-- **Duração e capítulos do DVD**: passam a seguir o tempo do IFO com o fator 1,001 do NTSC, batendo com o MakeMKV (antes o erro chegava a 4 segundos no fim do título).
-- **VLC**: o MKV de vídeo MPEG-2 recebe a marca de aplicativo de muxagem usada pelo MakeMKV, que evita a imagem esverdeada depois de avançar com a decodificação por hardware ligada. O arquivo continua identificado como TudoMKV.
-- **Abertura de disco**: o seletor prioriza o `VIDEO_TS.IFO` (DVD) e o `index.bdmv`/`MovieObject.bdmv` (Blu-ray), como o MakeMKV.
-- **Preferências**: aba Integration, para informar a chave da OMDb usada em Verificar.
-- **Verificar**: além de preencher as tags do MKV, abre um pop-up com os dados do título, a nota, o elenco e o poster.
-- **Conforto**: o log pode ser selecionado e copiado, e a pasta de saída abre no Explorer quando a gravação termina.
+- **Áudio mono vira estéreo 2.0**: em DVD e Blu-ray, cada faixa mono ganha uma alternativa estéreo marcável na árvore. Ao gravar, o áudio mono é duplicado canal a canal (sem a perda de volume do downmix comum) e a faixa estéreo AC-3 192 kbps sai como padrão, com o mono original preservado.
+- **Metadados deixam de se repetir entre discos**: as informações do IMDb agora pertencem ao disco aberto. Sem uma consulta verificada, nenhum dado de filme é gravado — antes, um disco sem IMDb informado saía com os dados do disco anterior.
+- **Nada de `tags.xml` na pasta do aplicativo**: as etiquetas são montadas na hora, a partir do retorno da OMDb, e passam pelo `mkvpropedit` por um arquivo temporário do sistema, apagado em seguida.
 
 Discos com proteção contra cópia (CSS, AACS) não são suportados. Veja o LEIA-ME.txt dentro do pacote.
 
@@ -29,4 +25,4 @@ Contribuidores
 - Clediomar do Carmo Santos
 - Trae (assistente de IA), no código, nos testes e no empacotamento
 
-Versão anterior: [v0.4.1](https://github.com/Hayllander/TudoMKV/releases/tag/v0.4.1)
+Versão anterior: [v0.4.6](https://github.com/Hayllander/TudoMKV/releases/tag/v0.4.6)

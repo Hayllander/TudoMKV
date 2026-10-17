@@ -60,7 +60,7 @@ public sealed class DvdReader(FfprobeInspector inspector) : IDiscReader
             Duration = title.Duration > TimeSpan.Zero ? title.Duration : probed.Duration,
             ChapterCount = Math.Max(probed.ChapterCount, title.Chapters),
             SizeBytes = title.SizeBytes,
-            Tracks = probed.Tracks,
+            Tracks = DiscTracks.WithMonoToStereo(probed.Tracks),
         };
     }
 }
@@ -109,6 +109,52 @@ internal static class DiscTracks
         8 => "Surround 7.1",
         _ => null,
     };
+
+    /// <summary>Nome da faixa estéreo gerada, para não se confundir com uma faixa estéreo do próprio disco.</summary>
+    public const string StereoTitle = "Stereo 2.0";
+
+    /// <summary>
+    /// Acrescenta, logo depois de cada áudio mono, a faixa estéreo 2.0 que o TudoMKV gera na gravação
+    /// (o mono continua no MKV). O estéreo novo assume a marca de faixa padrão, como faria com o primeiro áudio.
+    /// </summary>
+    public static IReadOnlyList<MediaTrack> WithMonoToStereo(IReadOnlyList<MediaTrack> tracks)
+    {
+        if (!tracks.Any(track => track.Type == TrackType.Audio && track.Channels == 1))
+        {
+            return tracks;
+        }
+
+        var result = new List<MediaTrack>(tracks.Count + 1);
+        foreach (var track in tracks)
+        {
+            result.Add(track);
+            if (track.Type == TrackType.Audio && track.Channels == 1)
+            {
+                result.Add(StereoAlternative(track));
+            }
+        }
+
+        return result;
+    }
+
+    private static MediaTrack StereoAlternative(MediaTrack mono)
+    {
+        mono.IsDefault = false;
+        return new MediaTrack
+        {
+            InputIndex = mono.InputIndex,
+            Index = mono.Index,
+            Type = TrackType.Audio,
+            Codec = AudioConversion.MonoToStereo.Codec,
+            Language = mono.Language,
+            Title = StereoTitle,
+            IsDefault = true,
+            Channels = 2,
+            SampleRate = mono.SampleRate,
+            Conversion = AudioConversion.MonoToStereo,
+            ConvertedFrom = mono,
+        };
+    }
 
     /// <summary>
     /// Blu-ray: "00" + PID (0x1011 vira "001011"). DVD: "01" + subfluxo + fluxo; o demuxer dvdvideo numera

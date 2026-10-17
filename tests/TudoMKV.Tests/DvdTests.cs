@@ -115,11 +115,27 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
         Assert.True(title.SizeBytes > 0);
         Assert.Equal(["-f", "dvdvideo", "-title", "1", "-trim", "0"], title.InputArguments);
         Assert.Equal(
-            [(TrackType.Video, "und"), (TrackType.Audio, "por"), (TrackType.Audio, "eng"), (TrackType.Subtitle, "por")],
+            [
+                (TrackType.Video, "und"),
+                (TrackType.Audio, "por"),
+                (TrackType.Audio, "por"),
+                (TrackType.Audio, "eng"),
+                (TrackType.Audio, "eng"),
+                (TrackType.Subtitle, "por"),
+            ],
             title.Tracks.Select(t => (t.Type, t.Language)));
         Assert.True(title.Tracks[0].IsDefault);
-        Assert.True(title.Tracks[1].IsDefault);
-        Assert.False(title.Tracks[2].IsDefault);
+        Assert.Equal([false, true, false, true], title.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsDefault));
+        Assert.False(title.Tracks[5].IsDefault);
+
+        // Cada áudio mono ganha um estéreo 2.0 gerado na gravação, que assume a marca de faixa padrão.
+        Assert.Equal([true, false, true, false], title.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsGenerated));
+        Assert.Equal([1, 2, 1, 2], title.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Channels));
+        Assert.Equal("Stereo 2.0", title.Tracks[2].Title);
+        Assert.Equal("por", title.Tracks[2].Language);
+        Assert.Same(title.Tracks[1], title.Tracks[2].ConvertedFrom);
+        Assert.Equal("0180BD", title.Tracks[1].SourceId);
+        Assert.Null(title.Tracks[2].SourceId);
     }
 
     [Fact]
@@ -140,11 +156,19 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
         Assert.Equal(2, result.ChapterCount);
         Assert.InRange(result.Duration.TotalSeconds, 7.5, 8.5);
         Assert.Equal(
-            [("mpeg2video", "und"), ("ac3", "por"), ("ac3", "eng"), ("dvd_subtitle", "por")],
+            [
+                ("mpeg2video", "und"),
+                ("ac3", "por"),
+                ("ac3", "por"),
+                ("ac3", "eng"),
+                ("ac3", "eng"),
+                ("dvd_subtitle", "por"),
+            ],
             result.Tracks.Select(t => (t.Codec, t.Language)));
-        Assert.True(result.Tracks[1].IsDefault);
-        Assert.Equal(["0100E0", "0180BD", "0181BD", "0120BD"], result.Tracks.Select(t => t.SourceId));
-        Assert.Equal("Mono", result.Tracks[1].Title);
+        Assert.Equal([false, true, false, true], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsDefault));
+        Assert.Equal([1, 2, 1, 2], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Channels));
+        Assert.Equal(["0100E0", "0180BD", "0181BD", "0120BD"], result.Tracks.Where(t => t.SourceId is not null).Select(t => t.SourceId!));
+        Assert.Equal(["Mono", "Stereo 2.0", "Mono", "Stereo 2.0"], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Title));
     }
 
     [Fact]
@@ -163,6 +187,7 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
         Assert.Contains(job.Tracks, track => track.Type == TrackType.Video && track.InputIndex == 0);
         Assert.Contains(job.Tracks, track => track.Type == TrackType.Audio && track.InputIndex == 0);
         Assert.Contains(job.Tracks, track => track.Type == TrackType.Subtitle && track.InputIndex == 1);
+        Assert.Contains(job.Tracks, track => track.IsGenerated && track.InputIndex == 0);
 
         try
         {
@@ -171,8 +196,16 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
             var result = await inspector.InspectAsync(job.OutputPath, TestContext.Current.CancellationToken);
             Assert.Equal(2, result.ChapterCount);
             Assert.Equal(
-                [("mpeg2video", "und"), ("ac3", "por"), ("ac3", "eng"), ("dvd_subtitle", "por")],
+                [
+                    ("mpeg2video", "und"),
+                    ("ac3", "por"),
+                    ("ac3", "por"),
+                    ("ac3", "eng"),
+                    ("ac3", "eng"),
+                    ("dvd_subtitle", "por"),
+                ],
                 result.Tracks.Select(t => (t.Codec, t.Language)));
+            Assert.Equal([1, 2, 1, 2], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Channels));
         }
         finally
         {
@@ -196,7 +229,7 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
 
         Assert.Equal(Path.Combine(_output, "TESTE_ISO_t02.mkv"), job.OutputPath);
         var result = await inspector.InspectAsync(job.OutputPath, TestContext.Current.CancellationToken);
-        Assert.Equal(2, result.Tracks.Count);
+        Assert.Equal(3, result.Tracks.Count);
     }
 
     [Fact]

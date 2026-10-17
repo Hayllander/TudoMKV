@@ -118,11 +118,12 @@ public sealed class SelectionMuxJobBuilder(FfprobeInspector inspector)
 
     private static bool TryBuildHybridTracks(MediaSource original, MediaSource merged, out IReadOnlyList<MediaTrack> tracks)
     {
+        // As faixas geradas não existem no disco: quem manda no pareamento é o vídeo e o áudio de verdade.
         var originalAv = original.Tracks
-            .Where(track => track.Type is TrackType.Video or TrackType.Audio)
+            .Where(track => !track.IsGenerated && track.Type is TrackType.Video or TrackType.Audio)
             .ToList();
         var mergedAv = merged.Tracks
-            .Where(track => track.Type is TrackType.Video or TrackType.Audio)
+            .Where(track => !track.IsGenerated && track.Type is TrackType.Video or TrackType.Audio)
             .ToList();
         if (!originalAv.Select(track => track.Type).SequenceEqual(mergedAv.Select(track => track.Type)))
         {
@@ -138,6 +139,13 @@ public sealed class SelectionMuxJobBuilder(FfprobeInspector inspector)
             .Where(track => track.Selected && track.CanMux)
             .Select(track =>
             {
+                if (track.IsGenerated)
+                {
+                    // O estéreo também vem do VOB físico, do mesmo áudio de onde saiu o mono.
+                    var mono = originalIndexes[track.ConvertedFrom!];
+                    return CloneTrack(track, inputIndex: 0, index: mergedAv[mono].Index);
+                }
+
                 if (track.Type is not (TrackType.Video or TrackType.Audio))
                 {
                     return CloneTrack(track, inputIndex: 1);
@@ -210,6 +218,8 @@ public sealed class SelectionMuxJobBuilder(FfprobeInspector inspector)
             Height = height ?? track.Height,
             Channels = channels ?? track.Channels,
             SampleRate = sampleRate ?? track.SampleRate,
+            Conversion = track.Conversion,
+            ConvertedFrom = track.ConvertedFrom,
         };
 
     private static void TryDelete(string path)

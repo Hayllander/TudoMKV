@@ -13,8 +13,8 @@ public class FfmpegArgumentsTests
         Tracks = tracks,
     };
 
-    private static MediaTrack Track(int index, TrackType type, string codec) =>
-        new() { Index = index, Type = type, Codec = codec };
+    private static MediaTrack Track(int index, TrackType type, string codec, int? channels = null) =>
+        new() { Index = index, Type = type, Codec = codec, Channels = channels };
 
     private static string ArgsText(MuxJob job) => string.Join(' ', FfmpegArguments.Build(job));
 
@@ -62,6 +62,74 @@ public class FfmpegArgumentsTests
             Track(1, TrackType.Subtitle, "mov_text"))));
 
         Assert.Contains("-c:1 srt", text);
+    }
+
+    [Fact]
+    public void DuplicatesAMonoTrackAsStereoThroughAPanFilter()
+    {
+        var mono = Track(1, TrackType.Audio, "ac3", channels: 1);
+        mono.Language = "por";
+        mono.Title = "Mono";
+        var tracks = DiscTracks.WithMonoToStereo([Track(0, TrackType.Video, "mpeg2video"), mono]);
+
+        var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
+
+        Assert.Contains("-filter_complex [0:1]pan=stereo|c0=c0|c1=c0[conv2]", text);
+        Assert.Contains("-map 0:0 -map 0:1 -map [conv2]", text);
+        Assert.Contains("-c copy", text);
+        Assert.Contains("-c:2 ac3 -b:2 192k", text);
+        Assert.Contains("-metadata:s:2 language=por", text);
+        Assert.Contains("-metadata:s:2 title=Stereo 2.0", text);
+        Assert.Contains("-disposition:2 default", text);
+        Assert.Contains("-disposition:1 0", text);
+        Assert.Contains("-metadata:s:1 title=Mono", text);
+        Assert.DoesNotContain("-metadata:s:2 SOURCE_ID", text);
+    }
+
+    [Fact]
+    public void JoinsAllGeneratedTracksInASingleFilterGraph()
+    {
+        var tracks = DiscTracks.WithMonoToStereo([
+            Track(0, TrackType.Video, "mpeg2video"),
+            Track(1, TrackType.Audio, "ac3", channels: 1),
+            Track(2, TrackType.Audio, "ac3", channels: 1),
+        ]);
+
+        var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
+
+        Assert.Contains("-filter_complex [0:1]pan=stereo|c0=c0|c1=c0[conv2];[0:2]pan=stereo|c0=c0|c1=c0[conv4]", text);
+        Assert.Contains("-map [conv2] -map 0:2 -map [conv4]", text);
+        Assert.Contains("-b:2 192k", text);
+        Assert.Contains("-b:4 192k", text);
+    }
+
+    [Fact]
+    public void AddsAStereoAlternativeRightAfterEachMonoTrack()
+    {
+        var video = Track(0, TrackType.Video, "mpeg2video");
+        var mono = Track(1, TrackType.Audio, "ac3", channels: 1);
+        var tracks = DiscTracks.WithMonoToStereo([video, mono]);
+
+        Assert.Equal([video, mono, tracks[2]], tracks);
+        var stereo = tracks[2];
+        Assert.True(stereo.IsGenerated);
+        Assert.Same(mono, stereo.ConvertedFrom);
+        Assert.Equal(AudioConversion.MonoToStereo, stereo.Conversion);
+        Assert.Equal("ac3", stereo.Codec);
+        Assert.Equal(2, stereo.Channels);
+        Assert.Equal(mono.Language, stereo.Language);
+        Assert.True(stereo.Selected);
+        Assert.True(stereo.IsDefault);
+        Assert.False(mono.IsDefault);
+    }
+
+    [Fact]
+    public void KeepsStereoAndMultiChannelAudioUntouched()
+    {
+        var stereo = new MediaTrack { Index = 1, Type = TrackType.Audio, Codec = "ac3", Channels = 2 };
+        var surround = new MediaTrack { Index = 2, Type = TrackType.Audio, Codec = "ac3", Channels = 6 };
+
+        Assert.Equal([stereo, surround], DiscTracks.WithMonoToStereo([stereo, surround]));
     }
 
     [Fact]

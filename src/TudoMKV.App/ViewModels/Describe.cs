@@ -156,6 +156,11 @@ public static class Describe
             parts.Add("(forçada)");
         }
 
+        if (track.IsGenerated)
+        {
+            parts.Add("(nova, de mono)");
+        }
+
         return string.Join(" ", parts.Where(p => p.Length > 0));
     }
 
@@ -190,6 +195,11 @@ public static class Describe
         if (!string.IsNullOrEmpty(track.Title))
         {
             lines.Add($"Nome: {track.Title}");
+        }
+
+        if (track.Conversion is { } conversion)
+        {
+            lines.Add($"Criada na gravação: {Codec(conversion.Codec)} {conversion.BitRateKbps} kbps a partir do áudio mono");
         }
 
         if (track.StreamId is not null)

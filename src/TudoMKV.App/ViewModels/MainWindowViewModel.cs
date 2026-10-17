@@ -20,18 +20,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IMuxer _muxer;
     private readonly SelectionMuxJobBuilder _jobBuilder;
     private readonly OmdbMetadataService _omdbMetadata;
-    private readonly TagFileService _tagFileService;
     private readonly MkvTagWriter _mkvTagWriter;
     private readonly List<(MediaSource Source, TreeNodeViewModel Title, TreeNodeViewModel? Chapters)> _titles = [];
     private CancellationTokenSource? _cancellation;
 
-    public MainWindowViewModel(SourceOpener opener, IMuxer muxer, SelectionMuxJobBuilder jobBuilder, OmdbMetadataService omdbMetadata, TagFileService tagFileService, MkvTagWriter mkvTagWriter)
+    public MainWindowViewModel(SourceOpener opener, IMuxer muxer, SelectionMuxJobBuilder jobBuilder, OmdbMetadataService omdbMetadata, MkvTagWriter mkvTagWriter)
     {
         _opener = opener;
         _muxer = muxer;
         _jobBuilder = jobBuilder;
         _omdbMetadata = omdbMetadata;
-        _tagFileService = tagFileService;
         _mkvTagWriter = mkvTagWriter;
         Log.CollectionChanged += (_, _) => OnPropertyChanged(nameof(LogText));
     }
@@ -135,6 +133,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 Show(contents);
                 OutputDirectory = DefaultOutputDirectory(contents, paths);
+                ClearMovieTags();
             }
             AddLog(contents.Titles.Count > 0 ? "Operação finalizada com sucesso" : "Nenhum título encontrado");
         }
@@ -179,14 +178,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 Title = source,
             };
 
-            foreach (var track in source.Tracks.Where(t => t.CanMux))
+            foreach (var track in source.Tracks.Where(t => t.CanMux && !t.IsGenerated))
             {
-                title.Children.Add(new TreeNodeViewModel(
+                var node = new TreeNodeViewModel(
                     NodeKind.Track, 2, Describe.TrackTypeName(track.Type), Describe.Track(track), Describe.TrackInfo(track),
                     isChecked: track.Selected, onChecked: value => track.Selected = value)
                 {
                     Title = source,
-                });
+                };
+                title.Children.Add(node);
+
+                // As faixas geradas ficam sob a faixa de onde saem (o estéreo logo abaixo do mono).
+                foreach (var generated in source.Tracks.Where(t => t.ConvertedFrom == track))
+                {
+                    node.Children.Add(new TreeNodeViewModel(
+                        NodeKind.Track, 3, Describe.TrackTypeName(generated.Type), Describe.Track(generated), Describe.TrackInfo(generated),
+                        isChecked: generated.Selected, onChecked: value => generated.Selected = value)
+                    {
+                        Title = source,
+                    });
+                    node.IsExpanded = true;
+                }
             }
 
             TreeNodeViewModel? chapters = null;
@@ -287,9 +299,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             var movie = await _omdbMetadata.FetchAsync(ImdbReference!);
-            _tagFileService.UpdateFromOmdb(movie);
             LastVerifiedMovie = movie;
-            AddLog($"IMDb {movie.ImdbId}: tags atualizadas em {Path.GetFileName(_tagFileService.TagsPath)}");
+            AddLog($"IMDb {movie.ImdbId}: metadados do filme guardados para o MKV");
             AddLog($"Título: {movie.Title} ({movie.Year})");
             StatusText = "Tags atualizadas";
         }
@@ -394,18 +405,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ClearLog() => Log.Clear();
 
+    /// <summary>
+    /// As tags pertencem ao disco que estava aberto: ao abrir outro, o filme verificado é esquecido. Sem isso,
+    /// um disco sem IMDb informado sairia com os metadados do filme anterior.
+    /// </summary>
+    private void ClearMovieTags()
+    {
+        LastVerifiedMovie = null;
+        ImdbReference = null;
+    }
+
+    /// <summary>
+    /// Monta as etiquetas na hora, a partir do filme que a API devolveu. Sem consulta verificada não há
+    /// etiqueta nenhuma; com uma guardada, o XML vai direto para o mkvpropedit, sem arquivo na pasta do app.
+    /// </summary>
     private async Task TryApplyTagsAsync(string outputPath, CancellationToken cancellationToken)
     {
-        var tagsPath = _tagFileService.TagsPath;
-        if (!File.Exists(tagsPath))
+        if (LastVerifiedMovie is not { } movie)
         {
             return;
         }
 
         try
         {
-            await _mkvTagWriter.ApplyGlobalTagsAsync(outputPath, tagsPath, cancellationToken);
-            AddLog($"Tags globais aplicadas: {Path.GetFileName(tagsPath)}");
+            await _mkvTagWriter.ApplyGlobalTagsAsync(outputPath, TagXml.Build(movie), cancellationToken);
+            AddLog($"Tags globais aplicadas: {movie.Title} ({movie.Year})");
         }
         catch (Exception ex) when (ex is FileNotFoundException or IOException or MuxException)
         {

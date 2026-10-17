@@ -68,7 +68,7 @@ public sealed class BlurayReader(FfprobeInspector inspector) : IDiscReader
             Duration = title.Duration,
             ChapterCount = title.Content.Chapters.Count,
             SizeBytes = title.SizeBytes,
-            Tracks = probed.Tracks,
+            Tracks = DiscTracks.WithMonoToStereo(probed.Tracks),
         };
     }
 

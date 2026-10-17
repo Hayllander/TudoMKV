@@ -23,7 +23,6 @@ public partial class App : Application
                 new FfmpegMuxer(),
                 new SelectionMuxJobBuilder(inspector),
                 new OmdbMetadataService(),
-                new TagFileService(),
                 new MkvTagWriter());
             var window = new MainWindow { DataContext = viewModel };
 
