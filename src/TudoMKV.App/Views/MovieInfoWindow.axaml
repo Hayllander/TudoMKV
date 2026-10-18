@@ -1,0 +1,95 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TudoMKV.App.ViewModels"
+        x:Class="TudoMKV.App.Views.MovieInfoWindow"
+        x:DataType="vm:MovieInfoDialogViewModel"
+        Title="Informações do filme (TMDb / OMDb)"
+        Width="860" Height="620"
+        MinWidth="700" MinHeight="520"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="*,Auto" Margin="16">
+    <Border BorderBrush="#D8DCE3" BorderThickness="1" CornerRadius="6" Padding="16">
+      <Grid ColumnDefinitions="220,16,*">
+        <Border Width="220"
+                Height="330"
+                CornerRadius="4"
+                BorderBrush="#D8DCE3"
+                BorderThickness="1"
+                Background="#F5F5F5"
+                ClipToBounds="True"
+                VerticalAlignment="Top">
+          <Grid>
+            <Image x:Name="PosterImage"
+                   Stretch="UniformToFill"
+                   IsVisible="False" />
+            <TextBlock x:Name="PosterPlaceholder"
+                       Text="Poster indisponível"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Opacity="0.65" />
+          </Grid>
+        </Border>
+
+        <Grid Grid.Column="2" RowDefinitions="Auto,14,*,14,Auto,180">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Subtitle}" FontSize="13" Opacity="0.7" />
+          </StackPanel>
+
+          <Border Grid.Row="2"
+                  Padding="0,0,6,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding Rows}" Grid.IsSharedSizeScope="True">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:InfoRow">
+                    <Grid Margin="0,2">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,14,0" VerticalAlignment="Top" />
+                      <SelectableTextBlock Grid.Column="1"
+                                           Text="{Binding Value}"
+                                           TextWrapping="Wrap"
+                                           LineHeight="20" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+
+          <TextBlock Grid.Row="4"
+                     Text="Sinopse"
+                     FontWeight="SemiBold" />
+
+          <Border Grid.Row="5"
+                  Margin="0,6,0,0"
+                  Padding="10"
+                  CornerRadius="4"
+                  BorderBrush="#D8DCE3"
+                  BorderThickness="1"
+                  Background="#FAFAFA">
+            <TextBox Text="{Binding Description}"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     BorderThickness="0"
+                     Background="Transparent" />
+          </Border>
+        </Grid>
+      </Grid>
+    </Border>
+
+    <Button Grid.Row="1"
+            Content="OK"
+            MinWidth="100"
+            Margin="0,14,0,0"
+            HorizontalAlignment="Right"
+            Click="OnOkClick" />
+  </Grid>
+</Window>

@@ -1,42 +1,22 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using TudoMKV.App.Configuration;
 
 namespace TudoMKV.App.Integration;
 
+/// <summary>Consulta a ficha do filme no OMDb, que responde pelos códigos do IMDb.</summary>
 public sealed class OmdbMetadataService
 {
     private static readonly HttpClient Http = new();
-    private static readonly Regex ImdbIdRegex = new(@"tt\d{7,9}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    public static string? TryExtractImdbId(string input)
+    public async Task<MovieInfo> FetchAsync(string imdbId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return null;
-        }
-
-        var match = ImdbIdRegex.Match(input);
-        return match.Success ? match.Value.ToLowerInvariant() : null;
-    }
-
-    public async Task<OmdbMovieInfo> FetchAsync(string imdbReference, CancellationToken cancellationToken = default)
-    {
-        var settings = AppSettingsStore.Load();
-        if (settings.Integration.Provider != MetadataProvider.Omdb)
-        {
-            throw new InvalidOperationException("Selecione OMDb nas Preferências, na aba Integration.");
-        }
-
-        if (string.IsNullOrWhiteSpace(settings.Integration.ApiData))
+        var apiKey = AppSettingsStore.Load().Integration.ApiData;
+        if (string.IsNullOrWhiteSpace(apiKey))
         {
             throw new InvalidOperationException("Informe a chave da API OMDb nas Preferências, na aba Integration.");
         }
 
-        var imdbId = TryExtractImdbId(imdbReference)
-            ?? throw new InvalidOperationException("Informe um link do IMDb ou um código no formato tt1234567.");
-
-        var url = $"https://www.omdbapi.com/?i={imdbId}&apikey={Uri.EscapeDataString(settings.Integration.ApiData)}";
+        var url = $"https://www.omdbapi.com/?i={Uri.EscapeDataString(imdbId)}&apikey={Uri.EscapeDataString(apiKey)}";
         using var response = await Http.GetAsync(url, cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -51,7 +31,7 @@ public sealed class OmdbMetadataService
                 : "OMDb não encontrou informações para esse título.");
         }
 
-        return new OmdbMovieInfo
+        return new MovieInfo
         {
             ImdbId = imdbId,
             Title = Clean(GetString(root, "Title")),

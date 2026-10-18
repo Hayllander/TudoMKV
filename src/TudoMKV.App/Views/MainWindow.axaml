@@ -168,14 +168,14 @@
         <DockPanel>
           <Border DockPanel.Dock="Top" Classes="cardHeader">
             <Grid ColumnDefinitions="Auto,10,*,8,Auto" VerticalAlignment="Center">
-              <TextBlock Classes="caption" Text="IMDb" />
+              <TextBlock Classes="caption" Text="Filme" />
               <TextBox Grid.Column="2"
-                       Text="{Binding ImdbReference}"
-                       PlaceholderText="Cole aqui o link do IMDb ou o código tt1234567"
+                       Text="{Binding MetadataReference}"
+                       PlaceholderText="Código do IMDb (tt1234567), número do TMDb ou link do filme"
                        VerticalAlignment="Center" />
               <Button Grid.Column="4"
                       Content="Verificar"
-                      Click="OnVerifyImdbClick"
+                      Click="OnVerifyMetadataClick"
                       Padding="14,6"
                       VerticalAlignment="Center" />
             </Grid>
@@ -293,6 +293,20 @@
             <TextBlock Classes="caption" Text="Log" />
             <Button Grid.Column="1" Classes="tool" Padding="8,3" FontSize="12" Content="Limpar" Command="{Binding ClearLogCommand}" ToolTip.Tip="Limpar o log" />
           </Grid>
+        </Border>
+        <Border DockPanel.Dock="Bottom"
+                IsVisible="{Binding OutputFolderLink, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                Background="{DynamicResource HeaderBackground}"
+                BorderBrush="{DynamicResource CardBorder}"
+                BorderThickness="0,1,0,0"
+                Padding="10,2">
+          <HyperlinkButton Command="{Binding OpenOutputFolderCommand}"
+                           ToolTip.Tip="Abrir a pasta onde os MKVs foram gravados">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource MutedText}" />
+              <TextBlock Text="{Binding OutputFolderLink}" FontSize="12" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </HyperlinkButton>
         </Border>
         <TextBox x:Name="LogBox" Text="{Binding LogText}" IsReadOnly="True" FontSize="12" Padding="12,8"
                  FontFamily="Cascadia Mono, Consolas, Menlo, monospace"

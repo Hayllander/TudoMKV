@@ -2,14 +2,14 @@ using TudoMKV.App.Integration;
 
 namespace TudoMKV.App.ViewModels;
 
-public sealed class ImdbInfoDialogViewModel
+public sealed class MovieInfoDialogViewModel
 {
-    public ImdbInfoDialogViewModel(OmdbMovieInfo movie)
+    public MovieInfoDialogViewModel(MovieInfo movie)
     {
         Title = string.IsNullOrWhiteSpace(movie.Year)
             ? movie.Title
             : $"{movie.Title} ({movie.Year})";
-        Subtitle = $"IMDb: {movie.ImdbId}";
+        Subtitle = movie.TmdbId.Length > 0 ? $"TMDb: {movie.TmdbId}" : $"IMDb: {movie.ImdbId}";
         Description = movie.Plot;
         Rows = CreateRows(movie);
     }
@@ -22,7 +22,7 @@ public sealed class ImdbInfoDialogViewModel
 
     public IReadOnlyList<InfoRow> Rows { get; }
 
-    private static IReadOnlyList<InfoRow> CreateRows(OmdbMovieInfo movie)
+    private static IReadOnlyList<InfoRow> CreateRows(MovieInfo movie)
     {
         var rows = new List<InfoRow>();
         AddIfPresent(rows, "Ano", movie.Year);
@@ -35,7 +35,9 @@ public sealed class ImdbInfoDialogViewModel
         AddIfPresent(rows, "Idioma", movie.Language);
         AddIfPresent(rows, "Atores", movie.Actors);
         AddIfPresent(rows, "Nota IMDb", movie.ImdbRating);
+        AddIfPresent(rows, "Nota TMDb", movie.TmdbRating);
         AddIfPresent(rows, "Codigo IMDb", movie.ImdbId);
+        AddIfPresent(rows, "Codigo TMDb", movie.TmdbId);
         return rows;
     }
 

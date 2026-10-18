@@ -19,17 +19,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly SourceOpener _opener;
     private readonly IMuxer _muxer;
     private readonly SelectionMuxJobBuilder _jobBuilder;
-    private readonly OmdbMetadataService _omdbMetadata;
+    private readonly MetadataLookup _metadataLookup;
     private readonly MkvTagWriter _mkvTagWriter;
     private readonly List<(MediaSource Source, TreeNodeViewModel Title, TreeNodeViewModel? Chapters)> _titles = [];
     private CancellationTokenSource? _cancellation;
 
-    public MainWindowViewModel(SourceOpener opener, IMuxer muxer, SelectionMuxJobBuilder jobBuilder, OmdbMetadataService omdbMetadata, MkvTagWriter mkvTagWriter)
+    public MainWindowViewModel(SourceOpener opener, IMuxer muxer, SelectionMuxJobBuilder jobBuilder, MetadataLookup metadataLookup, MkvTagWriter mkvTagWriter)
     {
         _opener = opener;
         _muxer = muxer;
         _jobBuilder = jobBuilder;
-        _omdbMetadata = omdbMetadata;
+        _metadataLookup = metadataLookup;
         _mkvTagWriter = mkvTagWriter;
         Log.CollectionChanged += (_, _) => OnPropertyChanged(nameof(LogText));
     }
@@ -84,10 +84,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(MakeMkvCommand))]
     public partial string? OutputDirectory { get; set; }
 
+    /// <summary>Pasta gravada na última operação: é ela que o link abaixo do log abre no Explorer.</summary>
+    [ObservableProperty]
+    public partial string? OutputFolderLink { get; set; }
+
+    /// <summary>
+    /// Abre o log com a versão em uso e avisa, sem travar a tela, quando houver versão mais nova publicada.
+    /// </summary>
+    public async Task StartupAsync()
+    {
+        AddLog(UpdateChecker.StartupLine());
+        if (await UpdateChecker.NewerVersionLineAsync() is { } newer)
+        {
+            AddLog(newer);
+        }
+    }
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(MakeMkvCommand))]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
-    [NotifyCanExecuteChangedFor(nameof(VerifyImdbCommand))]
+    [NotifyCanExecuteChangedFor(nameof(VerifyMetadataCommand))]
     public partial bool IsBusy { get; set; }
 
     public bool IsIdle => !IsBusy;
@@ -102,10 +118,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public partial string StatusText { get; set; } = "Pronto";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(VerifyImdbCommand))]
-    public partial string? ImdbReference { get; set; }
+    [NotifyCanExecuteChangedFor(nameof(VerifyMetadataCommand))]
+    public partial string? MetadataReference { get; set; }
 
-    public OmdbMovieInfo? LastVerifiedMovie { get; private set; }
+    public MovieInfo? LastVerifiedMovie { get; private set; }
 
     public async Task OpenAsync(IReadOnlyList<string> paths)
     {
@@ -287,26 +303,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool CanMakeMkv() =>
         !IsBusy && !string.IsNullOrWhiteSpace(OutputDirectory) && _titles.Any(t => t.Title.IsChecked);
 
-    private bool CanVerifyImdb() =>
-        !IsBusy && !string.IsNullOrWhiteSpace(ImdbReference);
+    private bool CanVerifyMetadata() =>
+        !IsBusy && !string.IsNullOrWhiteSpace(MetadataReference);
 
-    [RelayCommand(CanExecute = nameof(CanVerifyImdb))]
-    private async Task VerifyImdbAsync()
+    [RelayCommand(CanExecute = nameof(CanVerifyMetadata))]
+    private async Task VerifyMetadataAsync()
     {
         IsBusy = true;
-        StatusText = "Consultando OMDb…";
+        StatusText = "Consultando metadados…";
         LastVerifiedMovie = null;
         try
         {
-            var movie = await _omdbMetadata.FetchAsync(ImdbReference!);
+            var movie = await _metadataLookup.FetchAsync(MetadataReference!);
             LastVerifiedMovie = movie;
-            AddLog($"IMDb {movie.ImdbId}: metadados do filme guardados para o MKV");
+            AddLog($"{SourceOf(movie)}: metadados do filme guardados para o MKV");
             AddLog($"Título: {movie.Title} ({movie.Year})");
             StatusText = "Tags atualizadas";
         }
         catch (Exception ex)
         {
-            AddLog($"Falha ao consultar IMDb/OMDb: {ex.Message}");
+            AddLog($"Falha ao consultar os metadados: {ex.Message}");
             StatusText = "Erro na consulta";
         }
         finally
@@ -325,6 +341,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var selected = _titles.Where(t => t.Title.IsChecked).ToList();
         IsBusy = true;
         IsRipping = true;
+        OutputFolderLink = null;
         _cancellation = new CancellationTokenSource();
         var done = 0;
         try
@@ -367,12 +384,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             Progress = 100;
-            AddLog($"{done} título(s) gravado(s) com sucesso em {OutputDirectory}");
+            AddLog($"{done} título(s) gravado(s) com sucesso em \"{OutputDirectory}\"");
             StatusText = "Concluído";
 
+            // A pasta não abre sozinha: o link abaixo do log é que leva até ela.
             if (done > 0)
             {
-                OpenOutputFolder(OutputDirectory);
+                OutputFolderLink = OutputDirectory;
             }
         }
         catch (OperationCanceledException)
@@ -412,8 +430,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void ClearMovieTags()
     {
         LastVerifiedMovie = null;
-        ImdbReference = null;
+        MetadataReference = null;
     }
+
+    /// <summary>Como a ficha foi obtida, para o log dizer de onde vieram os metadados.</summary>
+    private static string SourceOf(MovieInfo movie) =>
+        movie.TmdbId.Length > 0 ? $"TMDb {movie.TmdbId}" : $"IMDb {movie.ImdbId}";
 
     /// <summary>
     /// Monta as etiquetas na hora, a partir do filme que a API devolveu. Sem consulta verificada não há
@@ -441,8 +463,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>Abre no Explorer a pasta gravada, a partir do link mostrado abaixo do log.</summary>
+    [RelayCommand]
+    private void OpenOutputFolder() => RevealInExplorer(OutputFolderLink);
+
     /// <summary>Abre a pasta dos MKVs no Explorer. Falhar nisso não pode invalidar a gravação.</summary>
-    private void OpenOutputFolder(string? folder)
+    private void RevealInExplorer(string? folder)
     {
         if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
         {

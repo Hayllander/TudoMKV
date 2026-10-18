@@ -16,9 +16,10 @@ public partial class PreferencesWindow : Window
     {
         ProviderCombo.SelectedIndex = settings.Integration.Provider switch
         {
-            MetadataProvider.Omdb => 1,
+            MetadataProvider.Tmdb => 1,
             _ => 0,
         };
+        TmdbKeyBox.Text = settings.Integration.TmdbApiKey;
         ApiDataBox.Text = settings.Integration.ApiData;
     }
 
@@ -26,7 +27,8 @@ public partial class PreferencesWindow : Window
     {
         Integration = new IntegrationSettings
         {
-            Provider = ProviderCombo.SelectedIndex == 1 ? MetadataProvider.Omdb : MetadataProvider.None,
+            Provider = ProviderCombo.SelectedIndex == 1 ? MetadataProvider.Tmdb : MetadataProvider.None,
+            TmdbApiKey = TmdbKeyBox.Text?.Trim() ?? string.Empty,
             ApiData = ApiDataBox.Text?.Trim() ?? string.Empty,
         },
     };

@@ -10,7 +10,7 @@ namespace TudoMKV.App.Integration;
 internal static class TagXml
 {
     /// <summary>As etiquetas do filme consultado, prontas para o mkvpropedit.</summary>
-    public static string Build(OmdbMovieInfo movie)
+    public static string Build(MovieInfo movie)
     {
         // Campo sem valor não é escrito de forma alguma (nem <String> vazio).
         var tag = new XElement("Tag",
@@ -25,6 +25,7 @@ internal static class TagXml
         AddIfPresent(tag, "Studio", movie.Studio);
         AddIfPresent(tag, "Description", movie.Plot);
         AddIfPresent(tag, "imdb", movie.ImdbId);
+        AddIfPresent(tag, "tmdb", movie.TmdbId);
 
         return new XDocument(new XElement("Tags", tag)).ToString();
     }

@@ -47,9 +47,20 @@ public partial class MainWindow : Window
             }
         };
         UpdateThemeIcon();
+        Opened += OnWindowOpened;
     }
 
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext!;
+
+    /// <summary>Primeira linha do log: versão em uso e, quando houver, o aviso de versão mais nova.</summary>
+    private async void OnWindowOpened(object? sender, EventArgs e)
+    {
+        Opened -= OnWindowOpened;
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            await viewModel.StartupAsync();
+        }
+    }
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
@@ -182,20 +193,20 @@ public partial class MainWindow : Window
         await dialog.ShowDialog<bool?>(this);
     }
 
-    private async void OnVerifyImdbClick(object? sender, RoutedEventArgs e)
+    private async void OnVerifyMetadataClick(object? sender, RoutedEventArgs e)
     {
-        if (!ViewModel.VerifyImdbCommand.CanExecute(null))
+        if (!ViewModel.VerifyMetadataCommand.CanExecute(null))
         {
             return;
         }
 
-        await ViewModel.VerifyImdbCommand.ExecuteAsync(null);
+        await ViewModel.VerifyMetadataCommand.ExecuteAsync(null);
         if (ViewModel.LastVerifiedMovie is not { } movie)
         {
             return;
         }
 
-        var dialog = new ImdbInfoWindow(movie);
+        var dialog = new MovieInfoWindow(movie);
         await dialog.ShowDialog(this);
     }
 

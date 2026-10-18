@@ -6,21 +6,21 @@ using TudoMKV.App.ViewModels;
 
 namespace TudoMKV.App.Views;
 
-public partial class ImdbInfoWindow : Window
+public partial class MovieInfoWindow : Window
 {
     private static readonly HttpClient Http = new();
-    private readonly OmdbMovieInfo? _movie;
+    private readonly MovieInfo? _movie;
 
-    public ImdbInfoWindow()
+    public MovieInfoWindow()
     {
         InitializeComponent();
     }
 
-    public ImdbInfoWindow(OmdbMovieInfo movie)
+    public MovieInfoWindow(MovieInfo movie)
         : this()
     {
         _movie = movie;
-        DataContext = new ImdbInfoDialogViewModel(movie);
+        DataContext = new MovieInfoDialogViewModel(movie);
         Opened += OnOpened;
     }
 

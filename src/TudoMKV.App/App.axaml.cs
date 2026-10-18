@@ -22,7 +22,7 @@ public partial class App : Application
                 new SourceOpener(inspector),
                 new FfmpegMuxer(),
                 new SelectionMuxJobBuilder(inspector),
-                new OmdbMetadataService(),
+                new MetadataLookup(new OmdbMetadataService(), new TmdbMetadataService()),
                 new MkvTagWriter());
             var window = new MainWindow { DataContext = viewModel };
 
