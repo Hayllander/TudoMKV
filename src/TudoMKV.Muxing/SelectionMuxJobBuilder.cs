@@ -12,9 +12,10 @@ public sealed class SelectionMuxJobBuilder(FfprobeInspector inspector)
         MediaSource source,
         string? outputDirectory = null,
         bool keepChapters = true,
+        string? outputBaseName = null,
         CancellationToken cancellationToken = default)
     {
-        var job = MuxJob.FromSelection(source, outputDirectory, keepChapters);
+        var job = MuxJob.FromSelection(source, outputDirectory, keepChapters, outputBaseName);
         return await TryBuildDvdHybridAsync(job, cancellationToken);
     }
 
@@ -158,6 +159,7 @@ public sealed class SelectionMuxJobBuilder(FfprobeInspector inspector)
                     index: replacement.Index,
                     streamId: replacement.StreamId,
                     codec: replacement.Codec,
+                    profile: replacement.Profile,
                     width: replacement.Width,
                     height: replacement.Height,
                     channels: replacement.Channels,
@@ -198,6 +200,7 @@ public sealed class SelectionMuxJobBuilder(FfprobeInspector inspector)
         int? index = null,
         int? streamId = null,
         string? codec = null,
+        string? profile = null,
         int? width = null,
         int? height = null,
         int? channels = null,
@@ -209,6 +212,7 @@ public sealed class SelectionMuxJobBuilder(FfprobeInspector inspector)
             SourceId = track.SourceId,
             Type = track.Type,
             Codec = codec ?? track.Codec,
+            Profile = profile ?? track.Profile,
             Language = track.Language,
             Title = track.Title,
             IsDefault = track.IsDefault,
@@ -220,6 +224,7 @@ public sealed class SelectionMuxJobBuilder(FfprobeInspector inspector)
             SampleRate = sampleRate ?? track.SampleRate,
             Conversion = track.Conversion,
             ConvertedFrom = track.ConvertedFrom,
+            EncodeTo = track.EncodeTo,
         };
 
     private static void TryDelete(string path)

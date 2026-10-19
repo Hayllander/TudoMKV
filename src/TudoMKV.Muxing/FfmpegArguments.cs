@@ -103,7 +103,20 @@ public static class FfmpegArguments
             if (track.Conversion is { } conversion)
             {
                 args.AddRange([$"-c:{output}", conversion.Codec]);
-                args.AddRange([$"-b:{output}", $"{conversion.BitRateKbps}k"]);
+                if (conversion.BitRateKbps is { } bitRate)
+                {
+                    // O FLAC não usa bitrate: só os codecs com perda recebem o valor da conversão.
+                    args.AddRange([$"-b:{output}", $"{bitRate}k"]);
+                }
+            }
+            else if (track.EncodeTo is { } encoding)
+            {
+                // A faixa em si é reencodada, sem filtro: o PCM do Blu-ray sai daqui em FLAC e o do DVD em AC-3.
+                args.AddRange([$"-c:{output}", encoding.Codec]);
+                if (encoding.BitRateKbps is { } bitRate)
+                {
+                    args.AddRange([$"-b:{output}", $"{bitRate}k"]);
+                }
             }
             else if (track.Type == TrackType.Subtitle && SubtitleConversions.TryGetValue(track.Codec, out var target))
             {

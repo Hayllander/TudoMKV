@@ -57,6 +57,7 @@ public static class Describe
         ["pcm_dvd"] = "LPCM",
         ["mp2"] = "Mpeg Audio",
         ["aac"] = "AAC",
+        ["flac"] = "FLAC",
         ["hdmv_pgs_subtitle"] = "PGS",
         ["dvd_subtitle"] = "Legendas DVD",
         ["subrip"] = "SRT",
@@ -199,7 +200,14 @@ public static class Describe
 
         if (track.Conversion is { } conversion)
         {
-            lines.Add($"Criada na gravação: {Codec(conversion.Codec)} {conversion.BitRateKbps} kbps a partir do áudio mono");
+            var bitRate = conversion.BitRateKbps is { } value ? $" {value} kbps" : string.Empty;
+            lines.Add($"Criada na gravação: {Codec(conversion.Codec)}{bitRate} a partir do áudio mono");
+        }
+
+        if (track.EncodeTo is { } target)
+        {
+            var bitRate = target.BitRateKbps is { } value ? $" a {value} kbps" : " sem perda";
+            lines.Add($"Convertida na gravação: {Codec(target.Codec)}{bitRate}, com os mesmos canais");
         }
 
         if (track.StreamId is not null)

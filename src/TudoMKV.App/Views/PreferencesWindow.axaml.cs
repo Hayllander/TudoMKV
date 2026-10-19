@@ -21,6 +21,8 @@ public partial class PreferencesWindow : Window
         };
         TmdbKeyBox.Text = settings.Integration.TmdbApiKey;
         ApiDataBox.Text = settings.Integration.ApiData;
+        Mpeg2CompatBox.IsChecked = settings.Muxing.MarkMpeg2ForVlc;
+        ReleaseGroupBox.Text = settings.Muxing.ReleaseGroup;
     }
 
     private AppSettings CurrentSettings() => new()
@@ -30,6 +32,11 @@ public partial class PreferencesWindow : Window
             Provider = ProviderCombo.SelectedIndex == 1 ? MetadataProvider.Tmdb : MetadataProvider.None,
             TmdbApiKey = TmdbKeyBox.Text?.Trim() ?? string.Empty,
             ApiData = ApiDataBox.Text?.Trim() ?? string.Empty,
+        },
+        Muxing = new MuxingSettings
+        {
+            MarkMpeg2ForVlc = Mpeg2CompatBox.IsChecked ?? true,
+            ReleaseGroup = ReleaseGroupBox.Text?.Trim() ?? string.Empty,
         },
     };
 

@@ -6,7 +6,7 @@ using TudoMKV.Core.Models;
 namespace TudoMKV.Muxing;
 
 /// <summary>Grava MKV chamando o ffmpeg como processo externo, com cópia de streams.</summary>
-public sealed class FfmpegMuxer(string? ffmpegPath = null) : IMuxer
+public sealed class FfmpegMuxer(string? ffmpegPath = null, Func<bool>? mpeg2VlcCompatibility = null) : IMuxer
 {
     private const int MaxLogLines = 40;
 
@@ -80,13 +80,19 @@ public sealed class FfmpegMuxer(string? ffmpegPath = null) : IMuxer
             throw new MuxException($"O ffmpeg terminou com código {process.ExitCode}.", log);
         }
 
-        if (job.Tracks.Any(t => t.Type == TrackType.Video && string.Equals(t.Codec, "mpeg2video", StringComparison.OrdinalIgnoreCase)))
+        if (MarkMpeg2ForVlc && job.Tracks.Any(t => t.Type == TrackType.Video && string.Equals(t.Codec, "mpeg2video", StringComparison.OrdinalIgnoreCase)))
         {
             VlcMpeg2Compat.Apply(job.OutputPath);
         }
 
         progress?.Report(1.0);
     }
+
+    /// <summary>
+    /// Marca o MKV de vídeo MPEG-2 como gravado pelo MakeMKV, o que o VLC 3 precisa para avançar sem imagem
+    /// verde. Vem das Preferências e fica ligada quando ninguém configura nada.
+    /// </summary>
+    private bool MarkMpeg2ForVlc => mpeg2VlcCompatibility?.Invoke() ?? true;
 
     /// <summary>Lê uma linha de <c>-progress pipe:1</c> e calcula a fração concluída.</summary>
     internal static bool TryParseProgress(string line, double totalMicroseconds, out double fraction)

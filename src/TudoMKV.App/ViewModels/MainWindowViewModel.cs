@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using TudoMKV.App.Configuration;
 using TudoMKV.App.Integration;
 using TudoMKV.Core;
 using TudoMKV.Core.Models;
@@ -23,6 +24,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly MkvTagWriter _mkvTagWriter;
     private readonly List<(MediaSource Source, TreeNodeViewModel Title, TreeNodeViewModel? Chapters)> _titles = [];
     private CancellationTokenSource? _cancellation;
+    private SourceKind _kind = SourceKind.Files;
 
     public MainWindowViewModel(SourceOpener opener, IMuxer muxer, SelectionMuxJobBuilder jobBuilder, MetadataLookup metadataLookup, MkvTagWriter mkvTagWriter)
     {
@@ -136,6 +138,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // A origem anterior sai da tela; libera as ISOs que montamos para ela.
         IsoMount.ReleaseAll();
 
+        // Outro disco começa do zero: a console fica só com o que este disco disser.
+        ClearLog();
+
         try
         {
             var contents = await _opener.OpenAsync(paths, MinimumTitleLength);
@@ -179,6 +184,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         Nodes.Clear();
         _titles.Clear();
+        _kind = contents.Kind;
 
         var root = new TreeNodeViewModel(
             NodeKind.Source, 0, Describe.KindName(contents.Kind),
@@ -353,7 +359,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     source,
                     OutputDirectory,
                     keepChapters: chapters?.IsChecked ?? true,
-                    _cancellation.Token);
+                    outputBaseName: ReleaseBaseName(source, selected.Count),
+                    cancellationToken: _cancellation.Token);
                 if (job.Tracks.Count == 0)
                 {
                     AddLog($"{source.DisplayName}: nenhuma faixa marcada, título ignorado.");
@@ -420,8 +427,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void Cancel() => _cancellation?.Cancel();
 
+    /// <summary>
+    /// Esvazia a console: o texto do disco anterior e a pasta do último MKV deixam de valer juntos.
+    /// </summary>
     [RelayCommand]
-    private void ClearLog() => Log.Clear();
+    private void ClearLog()
+    {
+        Log.Clear();
+        OutputFolderLink = null;
+    }
 
     /// <summary>
     /// As tags pertencem ao disco que estava aberto: ao abrir outro, o filme verificado é esquecido. Sem isso,
@@ -436,6 +450,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Como a ficha foi obtida, para o log dizer de onde vieram os metadados.</summary>
     private static string SourceOf(MovieInfo movie) =>
         movie.TmdbId.Length > 0 ? $"TMDb {movie.TmdbId}" : $"IMDb {movie.ImdbId}";
+
+    /// <summary>
+    /// Nome do MKV quando o filme foi identificado no TMDb ou no IMDb: sai no formato das releases de cena.
+    /// Com mais de um título marcado cada um fica com o nome do disco (_tNN), que é o que os distingue;
+    /// sem ficha verificada, também vale o nome do disco.
+    /// </summary>
+    private string? ReleaseBaseName(MediaSource source, int selectedCount)
+    {
+        if (selectedCount != 1 || LastVerifiedMovie is not { } movie)
+        {
+            return null;
+        }
+
+        var group = AppSettingsStore.Load().Muxing.ReleaseGroup.Trim();
+        return ReleaseName.Build(movie, source, _kind, group);
+    }
 
     /// <summary>
     /// Monta as etiquetas na hora, a partir do filme que a API devolveu. Sem consulta verificada não há

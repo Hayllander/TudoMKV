@@ -70,7 +70,7 @@ public class FfmpegArgumentsTests
         var mono = Track(1, TrackType.Audio, "ac3", channels: 1);
         mono.Language = "por";
         mono.Title = "Mono";
-        var tracks = DiscTracks.WithMonoToStereo([Track(0, TrackType.Video, "mpeg2video"), mono]);
+        var tracks = DiscTracks.WithMonoToStereo([Track(0, TrackType.Video, "mpeg2video"), mono], SourceKind.Dvd);
 
         var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
 
@@ -93,7 +93,7 @@ public class FfmpegArgumentsTests
             Track(0, TrackType.Video, "mpeg2video"),
             Track(1, TrackType.Audio, "ac3", channels: 1),
             Track(2, TrackType.Audio, "ac3", channels: 1),
-        ]);
+        ], SourceKind.Dvd);
 
         var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
 
@@ -108,7 +108,7 @@ public class FfmpegArgumentsTests
     {
         var video = Track(0, TrackType.Video, "mpeg2video");
         var mono = Track(1, TrackType.Audio, "ac3", channels: 1);
-        var tracks = DiscTracks.WithMonoToStereo([video, mono]);
+        var tracks = DiscTracks.WithMonoToStereo([video, mono], SourceKind.Dvd);
 
         Assert.Equal([video, mono, tracks[2]], tracks);
         var stereo = tracks[2];
@@ -124,12 +124,149 @@ public class FfmpegArgumentsTests
     }
 
     [Fact]
+    public void EncodesLosslessMonoOfABlurayAsFlacWithoutBitrate()
+    {
+        var mono = Track(1, TrackType.Audio, "pcm_bluray", channels: 1);
+        var tracks = new List<MediaTrack> { Track(0, TrackType.Video, "h264"), mono };
+        DiscTracks.EncodePcm(tracks, SourceKind.Bluray);
+
+        var withStereo = DiscTracks.WithMonoToStereo(tracks, SourceKind.Bluray);
+
+        Assert.Equal(AudioEncoding.Flac, mono.EncodeTo);
+        Assert.Equal(AudioConversion.MonoToStereoFlac, withStereo[2].Conversion);
+        Assert.Equal("flac", withStereo[2].Codec);
+
+        var text = ArgsText(MuxJob.FromSelection(Source([.. withStereo])));
+
+        Assert.Contains("-c:1 flac", text);
+        Assert.Contains("-filter_complex [0:1]pan=stereo|c0=c0|c1=c0[conv2]", text);
+        Assert.Contains("-c:2 flac", text);
+        Assert.Contains("-metadata:s:2 title=Stereo 2.0", text);
+        Assert.Contains("-disposition:2 default", text);
+        Assert.DoesNotContain("-b:2", text);
+    }
+
+    [Fact]
+    public void KeepsMonoOfABlurayThatAlreadyHasLossAsAc3()
+    {
+        var video = Track(0, TrackType.Video, "h264");
+        var mono = Track(1, TrackType.Audio, "ac3", channels: 1);
+        var tracks = DiscTracks.WithMonoToStereo([video, mono], SourceKind.Bluray);
+
+        var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
+
+        Assert.Equal(AudioConversion.MonoToStereo, tracks[2].Conversion);
+        Assert.Contains("-c:2 ac3 -b:2 192k", text);
+    }
+
+    [Fact]
+    public void EncodesThePcmOfABlurayAsFlacWithoutAFilter()
+    {
+        var pcm = Track(1, TrackType.Audio, "pcm_bluray", channels: 8);
+        var tracks = new List<MediaTrack> { Track(0, TrackType.Video, "h264"), pcm };
+        DiscTracks.EncodePcm(tracks, SourceKind.Bluray);
+
+        var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
+
+        Assert.Contains("-map 0:0 -map 0:1", text);
+        Assert.Contains("-c copy", text);
+        Assert.Contains("-c:1 flac", text);
+        Assert.DoesNotContain("-filter_complex", text);
+        Assert.DoesNotContain("-b:1", text);
+    }
+
+    [Fact]
+    public void EncodesThePcmOfADvdAsAc3At192Kbps()
+    {
+        var pcm = Track(1, TrackType.Audio, "pcm_dvd", channels: 2);
+        var tracks = new List<MediaTrack> { Track(0, TrackType.Video, "mpeg2video"), pcm };
+        DiscTracks.EncodePcm(tracks, SourceKind.Dvd);
+
+        var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
+
+        Assert.Equal(AudioEncoding.Ac3, pcm.EncodeTo);
+        Assert.Contains("-c copy", text);
+        Assert.Contains("-c:1 ac3 -b:1 192k", text);
+        Assert.DoesNotContain("-filter_complex", text);
+    }
+
+    [Fact]
+    public void GivesThe2Point0TrackToTheMonoPcmOfADvd()
+    {
+        var pcm = Track(1, TrackType.Audio, "pcm_dvd", channels: 1);
+        var tracks = new List<MediaTrack> { Track(0, TrackType.Video, "mpeg2video"), pcm };
+        DiscTracks.EncodePcm(tracks, SourceKind.Dvd);
+
+        var withStereo = DiscTracks.WithMonoToStereo(tracks, SourceKind.Dvd);
+        var text = ArgsText(MuxJob.FromSelection(Source([.. withStereo])));
+
+        Assert.Equal(AudioEncoding.Ac3, withStereo[1].EncodeTo);
+        Assert.Equal(AudioConversion.MonoToStereo, withStereo[2].Conversion);
+        Assert.Contains("-c:1 ac3 -b:1 192k", text);
+        Assert.Contains("-c:2 ac3 -b:2 192k", text);
+    }
+
+    [Fact]
+    public void LeavesAudioThatIsNotPcmCopied()
+    {
+        var tracks = new List<MediaTrack>
+        {
+            Track(0, TrackType.Audio, "pcm_bluray", channels: 8),
+            Track(1, TrackType.Audio, "truehd", channels: 6),
+            Track(2, TrackType.Audio, "dts", channels: 6),
+        };
+
+        DiscTracks.EncodePcm(tracks, SourceKind.Bluray);
+
+        Assert.Equal(AudioEncoding.Flac, tracks[0].EncodeTo);
+        Assert.Null(tracks[1].EncodeTo);
+        Assert.Null(tracks[2].EncodeTo);
+    }
+
+    [Fact]
     public void KeepsStereoAndMultiChannelAudioUntouched()
     {
         var stereo = new MediaTrack { Index = 1, Type = TrackType.Audio, Codec = "ac3", Channels = 2 };
         var surround = new MediaTrack { Index = 2, Type = TrackType.Audio, Codec = "ac3", Channels = 6 };
 
-        Assert.Equal([stereo, surround], DiscTracks.WithMonoToStereo([stereo, surround]));
+        Assert.Equal([stereo, surround], DiscTracks.WithMonoToStereo([stereo, surround], SourceKind.Bluray));
+    }
+
+    [Fact]
+    public void NamesAndMarksTheTracksOfAFileLikeADisc()
+    {
+        var tracks = new List<MediaTrack>
+        {
+            Track(0, TrackType.Video, "h264"),
+            Track(1, TrackType.Audio, "dts", channels: 8),
+            Track(2, TrackType.Audio, "pcm_bluray", channels: 8),
+        };
+
+        DiscTracks.Prepare(tracks, SourceKind.Files);
+        DiscTracks.EncodePcm(tracks, SourceKind.Files);
+
+        var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
+
+        Assert.Equal(["Surround 7.1", "Surround 7.1"], tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Title));
+        Assert.Contains("-disposition:0 default", text);
+        Assert.Contains("-disposition:1 default", text);
+        Assert.Contains("-disposition:2 0", text);
+        Assert.Contains("-c:2 flac", text);
+        Assert.DoesNotContain("SOURCE_ID", text);
+    }
+
+    [Fact]
+    public void KeepsTheNamesAndDefaultsTheFileAlreadyBrings()
+    {
+        var video = Track(0, TrackType.Video, "h264");
+        var audio = Track(1, TrackType.Audio, "dts", channels: 8);
+        audio.Title = "DTS-HD MA 7.1";
+        audio.IsDefault = true;
+
+        DiscTracks.Prepare([video, audio], SourceKind.Files);
+
+        Assert.Equal("DTS-HD MA 7.1", audio.Title);
+        Assert.False(video.IsDefault);
     }
 
     [Fact]

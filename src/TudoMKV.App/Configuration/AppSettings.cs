@@ -3,6 +3,23 @@ namespace TudoMKV.App.Configuration;
 public sealed class AppSettings
 {
     public IntegrationSettings Integration { get; set; } = new();
+
+    public MuxingSettings Muxing { get; set; } = new();
+}
+
+public sealed class MuxingSettings
+{
+    /// <summary>
+    /// Marca o MKV de vídeo MPEG-2 com <c>MuxingApp=libmakemkv</c>: sem essa marca o VLC 3 mostra imagem
+    /// verde ao avançar com decodificação por hardware. Ligada por padrão.
+    /// </summary>
+    public bool MarkMpeg2ForVlc { get; set; } = true;
+
+    /// <summary>
+    /// Assinatura no fim do nome do MKV, como nas releases de cena (o "-HAY" de
+    /// <c>Painted.Skin.2008.1080p.BluRay.REMUX.AVC.DTS-HD.MA7.1-HAY</c>).
+    /// </summary>
+    public string ReleaseGroup { get; set; } = "HAY";
 }
 
 public sealed class IntegrationSettings

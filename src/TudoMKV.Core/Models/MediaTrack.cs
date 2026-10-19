@@ -14,10 +14,39 @@ public enum TrackType
 /// mono nos dois canais em nível unitário; o <c>-ac 2</c> sozinho aplicaria -3 dB (upmix por potência)
 /// e a faixa estéreo sairia mais baixa que a mono.
 /// </summary>
-public sealed record AudioConversion(string Codec, int BitRateKbps, string Filter)
+/// <param name="BitRateKbps">Bitrate pedido ao codificador; nulo nos codecs sem perda, que não usam bitrate.</param>
+public sealed record AudioConversion(string Codec, int? BitRateKbps, string Filter)
 {
+    /// <summary>Codec FLAC, sem perda: a faixa gerada a partir do mono do Blu-ray e a conversão do PCM dele.</summary>
+    public const string FlacCodec = "flac";
+
     /// <summary>Mono para estéreo 2.0 em AC-3, a mesma família do áudio de DVD.</summary>
     public static AudioConversion MonoToStereo { get; } = new("ac3", 192, "pan=stereo|c0=c0|c1=c0");
+
+    /// <summary>
+    /// Mono para estéreo 2.0 em FLAC, sem perda: é o que o Blu-ray pede, para a qualidade do áudio do
+    /// disco não cair na faixa gerada.
+    /// </summary>
+    public static AudioConversion MonoToStereoFlac { get; } = new(FlacCodec, null, "pan=stereo|c0=c0|c1=c0");
+}
+
+/// <summary>
+/// Codec para o qual a própria faixa é reencodada na gravação, sem filtro nenhum: a faixa de saída é a
+/// mesma, com os mesmos canais, taxa de amostragem e profundidade.
+/// </summary>
+/// <param name="BitRateKbps">Bitrate pedido ao codificador; nulo nos codecs sem perda, que não usam bitrate.</param>
+public sealed record AudioEncoding(string Codec, int? BitRateKbps)
+{
+    /// <summary>
+    /// FLAC sem perda: é o destino do LPCM do Blu-ray, que sai com canais, taxa e profundidade como estão.
+    /// </summary>
+    public static AudioEncoding Flac { get; } = new(AudioConversion.FlacCodec, null);
+
+    /// <summary>
+    /// AC-3 a 192 kbps, o mesmo áudio que a faixa gerada do mono recebe: é o destino do PCM do DVD, que
+    /// entraria no MKV com 1,5 Mb/s sem necessidade.
+    /// </summary>
+    public static AudioEncoding Ac3 { get; } = new("ac3", 192);
 }
 
 /// <summary>Uma faixa (stream) de um arquivo ou título de disco.</summary>
@@ -42,6 +71,12 @@ public sealed class MediaTrack
 
     /// <summary>Nome do codec como o FFmpeg o reporta (h264, ac3, hdmv_pgs_subtitle...).</summary>
     public required string Codec { get; init; }
+
+    /// <summary>
+    /// Perfil do codec como o FFmpeg o reporta ("DTS-HD MA", "Dolby Digital Plus"...). É o que separa o
+    /// DTS-HD MA - sem perda - do DTS comum, já que o ffprobe reporta os dois como <c>dts</c>.
+    /// </summary>
+    public string? Profile { get; init; }
 
     /// <summary>Código de idioma ISO 639-2 (por, eng...) ou "und".</summary>
     public string Language { get; set; } = "und";
@@ -68,6 +103,12 @@ public sealed class MediaTrack
 
     /// <summary>A faixa da origem de que esta foi gerada (o áudio mono), para herdar idioma e nome.</summary>
     public MediaTrack? ConvertedFrom { get; init; }
+
+    /// <summary>
+    /// Codec para o qual a própria faixa é reencodada na gravação, sem filtro nenhum: o LPCM do Blu-ray vira
+    /// FLAC e o PCM do DVD vira AC-3. Nulo quando a faixa é copiada como está.
+    /// </summary>
+    public AudioEncoding? EncodeTo { get; set; }
 
     /// <summary>Faixa criada pelo TudoMKV na gravação, e não presente na origem.</summary>
     public bool IsGenerated => Conversion is not null;

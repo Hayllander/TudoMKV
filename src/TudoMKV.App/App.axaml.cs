@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using TudoMKV.App.Configuration;
 using TudoMKV.App.Integration;
 using TudoMKV.App.ViewModels;
 using TudoMKV.App.Views;
@@ -20,7 +21,7 @@ public partial class App : Application
             var inspector = new FfprobeInspector();
             var viewModel = new MainWindowViewModel(
                 new SourceOpener(inspector),
-                new FfmpegMuxer(),
+                new FfmpegMuxer(mpeg2VlcCompatibility: () => AppSettingsStore.Load().Muxing.MarkMpeg2ForVlc),
                 new SelectionMuxJobBuilder(inspector),
                 new MetadataLookup(new OmdbMetadataService(), new TmdbMetadataService()),
                 new MkvTagWriter());

@@ -125,6 +125,7 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
             SourceId = GetString(tags, "SOURCE_ID"),
             Type = type,
             Codec = GetString(stream, "codec_name") ?? GetString(tags, "mimetype") ?? "desconhecido",
+            Profile = GetString(stream, "profile"),
             Language = string.IsNullOrWhiteSpace(language) ? "und" : language,
             Title = GetString(tags, "title"),
             IsDefault = GetFlag(disposition, "default"),

@@ -10,31 +10,31 @@ Funciona como o MakeMKV: em Arquivo > Abrir arquivo, escolha o `VIDEO_TS.IFO` (D
 
 O MKV sai marcado como gravado pelo TudoMKV, com a data, os nomes das faixas de áudio (Stereo, Surround 5.1…) e o ID de cada faixa no disco de origem, como o MediaInfo mostra nos arquivos do MakeMKV.
 
-Novidades desta versão (desde a v0.4.9)
+Novidades desta versão (desde a v0.5.2)
 ---------------------------------------
 
-**Metadados pelo TMDb, com o OMDb de reserva**
+**O áudio do disco tratado como num remux**
 
-- O **TMDb** passa a ser a fonte principal das fichas dos filmes: em uma única consulta ele traz a sinopse completa, o gênero, o país, o estúdio, a duração, o idioma e o pôster. A chave da API já vem preenchida, então a busca funciona sem configurar nada.
-- A **referência digitada no campo Filme decide quem responde** pela consulta:
-  - `tt0887736` ou o link do IMDb vão para o **OMDb**, como antes;
-  - `223883`, `https://www.themoviedb.org/movie/223883` ou um link embrulhado em outro endereço (por exemplo `https://anon.to/?https://www.themoviedb.org/movie/91970`) vão para o **TMDb**.
-- O TMDb é a fonte principal e o OMDb entra como **reserva**: quando o TMDb não trouxer título ou sinopse, a ficha é completada pelo OMDb, usando o código IMDb que o próprio TMDb devolve no campo `imdb_id`. Se a reserva falhar, a consulta continua válida com o que o TMDb já trouxe.
-- A janela de informações do filme ganhou **pôster**, notas do IMDb e do TMDb e a lista completa dos campos. Ela agora é **redimensionável** e a sinopse tem área própria com rolagem: antes, a descrição chegava a ficar escondida quando a lista de campos crescia.
-- As etiquetas gravadas no MKV passam a levar também os identificadores **`imdb`** e **`tmdb`**, somados a título, ano, diretor, gênero, país, estúdio e descrição.
-- Nas Preferências (aba Integração) há dois campos de chave — TMDb e OMDb — e a opção de integração passou a se chamar **"TMDb, com o OMDb de reserva"**.
+- No **Blu-ray**, toda faixa **LPCM/PCM** passa a ser reencodada em **FLAC sem perda**, mantendo os canais, a taxa de amostragem e a profundidade — o PCM 7.1 do *Painted Skin* sai como um FLAC 7.1 idêntico, com cerca de um terço do tamanho.
+- No **DVD**, toda faixa **PCM/LPCM** passa a sair em **AC-3 a 192 kbps**, mantendo os canais: o PCM original não entra mais no MKV carregando 1,5 Mb/s sem necessidade.
+- Todo **áudio mono** de disco ganha uma faixa **estéreo 2.0 marcada como padrão**, para a reprodução não reservar surpresas: **FLAC sem perda** quando a origem é sem perda (LPCM, TrueHD, FLAC ou DTS-HD MA) e **AC-3 a 192 kbps** quando a origem tem perda. A faixa mono original continua no arquivo, desmarcada.
+- O **DTS-HD MA** passa a ser reconhecido pelo perfil que o ffprobe devolve: antes ele era lido como DTS comum e o mono desse codec acabava virando AC-3 em vez de FLAC.
+- **Arquivos comuns** (`.ts`, `.mkv`) recebem o mesmo tratamento dos discos: nomes de faixa e marcas de padrão onde a origem não traz nenhum, mais a conversão do PCM em FLAC. Fora isso, tudo fica igual à origem.
 
-**Log mais informativo, com link para a pasta gravada**
+**Nome do MKV no padrão das releases**
 
-- A primeira linha do log identifica o aplicativo e a plataforma: `TudoMKV v0.5.2 win(x64-release) Iniciado`.
-- Na abertura, o TudoMKV consulta a última versão publicada no GitHub e, quando existe uma mais nova, avisa no log com o endereço de download. Sem internet, o aviso simplesmente não aparece e o aplicativo abre normalmente.
-- No fim da gravação, a mensagem mostra a **pasta de destino entre aspas** e, logo abaixo do log, aparece um **link clicável** com o caminho. O clique abre a pasta exata onde os MKVs foram gravados.
+- Quando o filme é identificado no **TMDb ou no IMDb** e há **um único título marcado**, o MKV passa a ser gravado com o nome no formato das releases de cena:
+  - DVD: `Bastard.Swordsman.1983.DVD.REMUX.DD2.0.MPEG2-HAY`
+  - Blu-ray: `Painted.Skin.2008.1080p.BluRay.REMUX.AVC.DTS-HD.MA7.1-HAY`
+- O nome sai da ficha (título e ano) e da origem (resolução, codec de vídeo e o codec da **faixa de áudio padrão**, já contando o que a gravação reencoda).
+- Com **mais de um título marcado**, ou sem ficha verificada, cada arquivo continua com o nome do disco (`_t01`, `_t02`…), que é o que os distingue.
+- A assinatura do grupo (`-HAY`) é **configurável nas Preferências**, na aba Muxing; em branco, o MKV sai sem assinatura.
 
-O que muda no uso
------------------
+**Capítulos, preferências e console**
 
-- O Explorer **não abre mais sozinho** ao terminar a gravação: a pasta só abre quando você clicar no link abaixo do log. E o link leva à pasta dos arquivos gerados, não à raiz do disco.
-- Informar o código do IMDb continua funcionando exatamente como antes; o que mudou é que agora existe também o caminho pelo TMDb, com ficha mais completa.
+- Os capítulos saem em inglês, numerados `Chapter 1`, `Chapter 2`…, como nas releases.
+- Nova opção em **Preferências > Muxing**: marcar os MKVs de vídeo **MPEG-2** como gravados pelo `libmakemkv`, o que evita a imagem verde do VLC 3 ao avançar o vídeo com aceleração por hardware. O arquivo em si não muda: é só o nome do gravador que fica registrado no MKV, como nos arquivos do MakeMKV.
+- A console é limpa automaticamente ao abrir uma nova origem, e o botão de limpar o log apaga também o link da pasta de destino.
 
 Discos com proteção contra cópia (CSS, AACS) não são suportados. Veja o LEIA-ME.txt dentro do pacote.
 
@@ -44,4 +44,4 @@ Contribuidores
 - Clediomar do Carmo Santos
 - Trae (assistente de IA), no código, nos testes e no empacotamento
 
-Versão anterior: [v0.4.9](https://github.com/Hayllander/TudoMKV/releases/tag/v0.4.9)
+Versão anterior: [v0.5.2](https://github.com/Hayllander/TudoMKV/releases/tag/v0.5.2)

@@ -38,6 +38,14 @@ public sealed class SourceOpener
             try
             {
                 var source = await _inspector.InspectAsync(path, cancellationToken);
+
+                // O arquivo recebe o mesmo trato do disco e nada além disso: nome de faixa de áudio e marcas
+                // de padrão apenas onde a origem não traz nenhuma.
+                DiscTracks.Prepare(source.Tracks, SourceKind.Files);
+
+                // Vale para arquivo também: o LPCM de um remux do Blu-ray vira FLAC sem perda e sem filtro.
+                DiscTracks.EncodePcm(source.Tracks, SourceKind.Files);
+
                 titles.Add(source);
                 messages.Add($"Arquivo {Path.GetFileName(path)} foi adicionado ({source.Duration:h\\:mm\\:ss})");
             }

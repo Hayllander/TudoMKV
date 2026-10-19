@@ -54,6 +54,9 @@ public sealed class BlurayReader(FfprobeInspector inspector) : IDiscReader
         var probed = await inspector.InspectAsync(title.ClipPaths[0], cancellationToken);
         ApplyPlaylistStreams(probed.Tracks, title.Content.Streams);
         DiscTracks.Prepare(probed.Tracks, SourceKind.Bluray);
+        DiscTracks.EncodePcm(probed.Tracks, SourceKind.Bluray);
+
+        var tracks = DiscTracks.WithMonoToStereo(probed.Tracks, SourceKind.Bluray);
 
         return new MediaSource
         {
@@ -68,7 +71,7 @@ public sealed class BlurayReader(FfprobeInspector inspector) : IDiscReader
             Duration = title.Duration,
             ChapterCount = title.Content.Chapters.Count,
             SizeBytes = title.SizeBytes,
-            Tracks = DiscTracks.WithMonoToStereo(probed.Tracks),
+            Tracks = tracks,
         };
     }
 

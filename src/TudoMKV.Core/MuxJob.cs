@@ -39,12 +39,22 @@ public sealed class MuxJob
         }
     }
 
-    /// <summary>Cria um job com as faixas marcadas da origem, gravando ao lado dela ou em outra pasta.</summary>
-    public static MuxJob FromSelection(MediaSource source, string? outputDirectory = null, bool keepChapters = true)
+    /// <summary>
+    /// Cria um job com as faixas marcadas da origem, gravando ao lado dela ou em outra pasta.
+    /// </summary>
+    /// <param name="outputBaseName">
+    /// Nome do MKV sem extensão, quando já houver um escolhido (o das releases de cena); nulo mantém o nome
+    /// que a própria origem pediu.
+    /// </param>
+    public static MuxJob FromSelection(
+        MediaSource source,
+        string? outputDirectory = null,
+        bool keepChapters = true,
+        string? outputBaseName = null)
     {
         var directory = outputDirectory
             ?? (source.IsDisc ? DefaultDiscOutputDirectory : Path.GetDirectoryName(source.Path) ?? ".");
-        var baseName = source.OutputBaseName ?? Path.GetFileNameWithoutExtension(source.Path);
+        var baseName = outputBaseName ?? source.OutputBaseName ?? Path.GetFileNameWithoutExtension(source.Path);
         var output = Path.Combine(directory, baseName + ".mkv");
         if (string.Equals(Path.GetFullPath(output), Path.GetFullPath(source.Path), StringComparison.OrdinalIgnoreCase))
         {
