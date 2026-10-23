@@ -46,10 +46,10 @@ Os testes de integração geram um MP4 de amostra, um DVD de teste (com `dvdauth
 
 ```sh
 build/package-windows.sh 0.4.6          # zip portátil (Linux ou Git Bash)
-build/package-installer.ps1 -Version 0.4.6   # instalador (PowerShell, só no Windows)
+build/package-installer.ps1 -Version 0.4.6   # instalador NSIS (só no Windows)
 ```
 
-O `package-windows.sh` gera `dist/TudoMKV-0.4.6-win-x64.zip`, com o app autocontido e o FFmpeg da BtbN. O `package-installer.ps1` gera `dist/TudoMKV-0.4.6-setup.exe` com o IExpress — por isso roda apenas no Windows — empacotando o mesmo conteúdo mais os scripts de instalação. Ao enviar uma tag `v*`, o workflow `Release` gera os dois e anexa ambos à release.
+O `package-windows.sh` gera `dist/TudoMKV-0.4.6-win-x64.zip`, com o app autocontido e o FFmpeg da BtbN. O `package-installer.ps1` gera `dist/TudoMKV-0.4.6-setup.exe` com o NSIS — por isso roda apenas no Windows e precisa do `makensis` instalado — empacotando o mesmo conteúdo. Instala por usuário, em `%LOCALAPPDATA%\Programs\TudoMKV`, sem administrador, e aceita `/S` para instalar sem janelas. Ao enviar uma tag `v*`, o workflow `Release` gera os dois e anexa ambos à release.
 
 ## Estrutura
 

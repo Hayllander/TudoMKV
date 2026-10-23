@@ -44,8 +44,8 @@ jobs:
             --title "TudoMKV $VERSION" \
             --notes-file build/release-notes.md
 
-  # O instalador usa o IExpress, que só existe no Windows, e é anexado ao release que o
-  # job acima acabou de criar.
+  # O instalador é montado com o NSIS (makensis), que só existe no Windows, e é anexado ao
+  # release que o job acima acabou de criar.
   windows-installer:
     needs: windows-package
     runs-on: windows-latest
@@ -56,7 +56,14 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Gerar o instalador auto-extraível
+      - name: Instalar o NSIS
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'C:\Program Files (x86)\NSIS\makensis.exe')) {
+            choco install nsis --yes --no-progress
+          }
+
+      - name: Gerar o instalador com o NSIS
         shell: pwsh
         run: build/package-installer.ps1 -Version "${{ needs.windows-package.outputs.version }}"
 

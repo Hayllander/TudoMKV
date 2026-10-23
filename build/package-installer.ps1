@@ -1,11 +1,13 @@
-﻿#!/usr/bin/env pwsh
-# Gera dist/TudoMKV-<versão>-setup.exe: instalador auto-extraível (IExpress) com o
-# TudoMKV.exe autocontido, o FFmpeg e os scripts de instalação/desinstalação.
+#!/usr/bin/env pwsh
+# Gera dist/TudoMKV-<versão>-setup.exe: instalador NSIS (build/installer/TudoMKV.nsi) com o
+# TudoMKV.exe autocontido, o FFmpeg e o desinstalador. Instala por usuário, sem administrador.
 #
 # Uso: build/package-installer.ps1 -Version 0.4.6 [-FfmpegDir <pasta-bin-do-ffmpeg>] [-SkipPublish]
 #
 # Sem a pasta do FFmpeg, baixa a build GPL "shared" mais recente da BtbN (a mesma do
 # package-windows.sh, com libdvdnav e libbluray).
+#
+# Precisa do NSIS instalado (https://nsis.sourceforge.io), que traz o makensis.exe.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Version,
@@ -18,12 +20,44 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $root 'dist'
 $stage = Join-Path $dist 'TudoMKV'
-$flat = Join-Path $dist 'TudoMKV-installer-flat'
+$nsi = Join-Path $root 'build\installer\TudoMKV.nsi'
 $setupPath = Join-Path $dist "TudoMKV-$Version-setup.exe"
 $ffmpegUrl = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip'
 
 function Write-Step([string]$Text) {
     Write-Host "==> $Text"
+}
+
+# O makensis costuma ficar fora do PATH, então procura nos lugares de sempre antes de desistir.
+function Find-Makensis {
+    $candidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'),
+        (Join-Path $env:ProgramFiles 'NSIS\makensis.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\NSIS\makensis.exe')
+    )
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate)) {
+            return $candidate
+        }
+    }
+
+    $command = Get-Command 'makensis.exe' -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    throw 'Não encontrei o makensis.exe. Instale o NSIS (https://nsis.sourceforge.io).'
+}
+
+# O VIProductVersion do NSIS exige as quatro partes do número da versão (0.5.11 vira 0.5.11.0).
+function ConvertTo-ViVersion([string]$Text) {
+    $parts = @($Text -split '[^0-9]+' | Where-Object { $_ -ne '' })
+    while ($parts.Count -lt 4) {
+        $parts += '0'
+    }
+
+    return ($parts[0..3] -join '.')
 }
 
 # 1) Programa (mesma publicação do executável: autocontido, arquivo único, comprimido).
@@ -85,99 +119,24 @@ if (Test-Path -LiteralPath $ffmpegLicense) {
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination (Join-Path $stage 'LICENSE.txt') -Force
 Copy-Item -LiteralPath (Join-Path $root 'build\LEIA-ME.txt') -Destination (Join-Path $stage 'LEIA-ME.txt') -Force
 
-# 3) O IExpress descompacta tudo achatado em uma pasta só, então o pacote é montado já
-# achatado: a estrutura runtimes\ffmpeg é remontada pelo install.ps1 na hora de instalar.
-Write-Step 'Montando a pasta de empacotamento'
-if (Test-Path -LiteralPath $flat) {
-    Remove-Item -LiteralPath $flat -Recurse -Force
-}
+# 3) Empacotar: o NSIS copia a estrutura de dist\TudoMKV como ela está (o FFmpeg já vai
+# para runtimes\ffmpeg) e comprime em LZMA.
+$makensis = Find-Makensis
+$viVersion = ConvertTo-ViVersion $Version
 
-New-Item -ItemType Directory -Path $flat -Force | Out-Null
-
-$payload = @()
-$payload += Get-ChildItem -LiteralPath $stage -Recurse -File
-foreach ($name in 'install.cmd', 'install.ps1', 'uninstall.ps1') {
-    $payload += Get-Item -LiteralPath (Join-Path $root "build\installer\$name")
-}
-
-foreach ($file in $payload) {
-    $destination = Join-Path $flat $file.Name
-    if (Test-Path -LiteralPath $destination) {
-        throw "Dois arquivos com o mesmo nome no pacote: $($file.Name)"
-    }
-
-    Copy-Item -LiteralPath $file.FullName -Destination $destination
-}
-
-# 4) Diretiva do IExpress: lista os arquivos e manda rodar o install.cmd no fim.
-Write-Step 'Escrevendo a diretiva do IExpress'
-
-$files = Get-ChildItem -LiteralPath $flat -File | Sort-Object Name
-$strings = [System.Text.StringBuilder]::new()
-$sources = [System.Text.StringBuilder]::new()
-for ($i = 0; $i -lt $files.Count; $i++) {
-    [void]$strings.AppendLine("FILE$i=`"$($files[$i].Name)`"")
-    [void]$sources.AppendLine("%FILE$i%=")
-}
-
-$sed = @"
-[Version]
-Class=IEXPRESS
-SEDVersion=3
-[Options]
-PackagePurpose=InstallApp
-ShowInstallProgramWindow=0
-HideExtractAnimation=0
-UseLongFileName=1
-InsideCompressed=0
-CAB_FixedSize=0
-CAB_ResvCodeSigning=0
-RebootMode=N
-InstallPrompt=
-DisplayLicense=
-FinishMessage=
-TargetName=$setupPath
-FriendlyName=TudoMKV $Version
-AppLaunched=cmd.exe /c install.cmd
-PostInstallCmd=<None>
-AdminQuietInstCmd=install.cmd /S
-UserQuietInstCmd=install.cmd /S
-SourceFiles=SourceFiles
-[Strings]
-$strings
-[SourceFiles]
-SourceFiles0=$flat\
-[SourceFiles0]
-$sources
-"@
-
-$sedPath = Join-Path $dist "TudoMKV-$Version-setup.sed"
-# O IExpress lê a diretiva linha a linha no formato do Windows, então quebra de linha CRLF
-# sempre, independente de como este script foi salvo.
-$sed = ($sed -split "\r?\n") -join "`r`n"
-Set-Content -LiteralPath $sedPath -Value $sed -Encoding ASCII
-
-# 5) Empacotar.
-Write-Step "Gerando o instalador ($($files.Count) arquivos)"
+Write-Step "Gerando o instalador com o NSIS ($makensis)"
 if (Test-Path -LiteralPath $setupPath) {
     Remove-Item -LiteralPath $setupPath -Force
 }
 
-$iexpress = Join-Path $env:SystemRoot 'System32\iexpress.exe'
-# O IExpress é um programa gráfico: a espera é explícita e com prazo, para uma janela de
-# erro não travar o empacotamento.
-$process = Start-Process -FilePath $iexpress -ArgumentList '/N', '/Q', $sedPath -PassThru
-if (-not $process.WaitForExit(300000)) {
-    $process.Kill()
-    throw "O IExpress não terminou em 5 minutos. Veja a diretiva em $sedPath"
+& $makensis /V2 "/DVERSION=$Version" "/DVI_VERSION=$viVersion" "/DSOURCE=$stage" "/DOUTFILE=$setupPath" $nsi
+if ($LASTEXITCODE -ne 0) {
+    throw "O makensis falhou com o código $LASTEXITCODE."
 }
 
 if (-not (Test-Path -LiteralPath $setupPath)) {
-    throw "O IExpress não gerou o instalador. Veja a diretiva em $sedPath"
+    throw "O makensis não gerou o instalador em $setupPath."
 }
-
-Remove-Item -LiteralPath $flat -Recurse -Force
-Remove-Item -LiteralPath $sedPath -Force
 
 $sizeMb = [math]::Round((Get-Item -LiteralPath $setupPath).Length / 1MB, 1)
 Write-Step "Pronto: $setupPath ($sizeMb MB)"
