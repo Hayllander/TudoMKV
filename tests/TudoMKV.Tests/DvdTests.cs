@@ -125,13 +125,13 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
             ],
             title.Tracks.Select(t => (t.Type, t.Language)));
         Assert.True(title.Tracks[0].IsDefault);
-        Assert.Equal([false, true, false, true], title.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsDefault));
+        Assert.Equal([false, true, false, false], title.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsDefault));
         Assert.False(title.Tracks[5].IsDefault);
 
-        // Cada áudio mono ganha um estéreo 2.0 gerado na gravação, que assume a marca de faixa padrão.
+        // Cada áudio mono ganha um estéreo 2.0 gerado na gravação; só o do mono padrão herda a marca.
         Assert.Equal([true, false, true, false], title.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsGenerated));
         Assert.Equal([1, 2, 1, 2], title.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Channels));
-        Assert.Equal("Stereo 2.0", title.Tracks[2].Title);
+        Assert.Equal("Portuguese AC3 2.0", title.Tracks[2].Title);
         Assert.Equal("por", title.Tracks[2].Language);
         Assert.Same(title.Tracks[1], title.Tracks[2].ConvertedFrom);
         Assert.Equal("0180BD", title.Tracks[1].SourceId);
@@ -165,10 +165,10 @@ public sealed class DvdTests(TestDvd dvd) : IClassFixture<TestDvd>, IDisposable
                 ("dvd_subtitle", "por"),
             ],
             result.Tracks.Select(t => (t.Codec, t.Language)));
-        Assert.Equal([false, true, false, true], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsDefault));
+        Assert.Equal([false, true, false, false], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsDefault));
         Assert.Equal([1, 2, 1, 2], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Channels));
         Assert.Equal(["0100E0", "0180BD", "0181BD", "0120BD"], result.Tracks.Where(t => t.SourceId is not null).Select(t => t.SourceId!));
-        Assert.Equal(["Mono", "Stereo 2.0", "Mono", "Stereo 2.0"], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Title));
+        Assert.Equal(["Portuguese AC3 1.0", "Portuguese AC3 2.0", "English AC3 1.0", "English AC3 2.0"], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Title));
     }
 
     [Fact]

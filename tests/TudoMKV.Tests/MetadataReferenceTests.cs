@@ -7,6 +7,7 @@ public class MetadataReferenceTests
     [Theory]
     [InlineData("tt0887736", MetadataSource.Imdb, "tt0887736")]
     [InlineData("https://www.imdb.com/title/tt0887736/", MetadataSource.Imdb, "tt0887736")]
+    [InlineData("0111161", MetadataSource.Imdb, "tt0111161")]
     [InlineData("223883", MetadataSource.Tmdb, "223883")]
     [InlineData("  91970  ", MetadataSource.Tmdb, "91970")]
     [InlineData("https://www.themoviedb.org/movie/223883", MetadataSource.Tmdb, "223883")]

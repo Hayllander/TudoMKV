@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using TudoMKV.Core;
 using TudoMKV.Core.Models;
 
@@ -125,6 +126,7 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
             SourceId = GetString(tags, "SOURCE_ID"),
             Type = type,
             Codec = GetString(stream, "codec_name") ?? GetString(tags, "mimetype") ?? "desconhecido",
+            CodecLongName = GetString(stream, "codec_long_name"),
             Profile = GetString(stream, "profile"),
             Language = string.IsNullOrWhiteSpace(language) ? "und" : language,
             Title = GetString(tags, "title"),
@@ -134,8 +136,65 @@ public sealed class FfprobeInspector(string? ffprobePath = null) : IMediaInspect
             Height = GetInt(stream, "height"),
             Channels = GetInt(stream, "channels"),
             SampleRate = int.TryParse(GetString(stream, "sample_rate"), out var rate) ? rate : null,
+            BitRate = MaxBitRate(stream, tags),
+            BitsPerSample = ParseBits(stream),
             Selected = type is not TrackType.Data,
         };
+    }
+
+    /// <summary>
+    /// O bitrate do áudio: o que o ffprobe calcula ou o que as tags BPS/BITRATE trazem, que é o que um
+    /// MKV do MakeMKV ou do mkvmerge guarda. Vale o maior, como no ShawScope-Audio.
+    /// </summary>
+    private static long? MaxBitRate(JsonElement stream, JsonElement tags)
+    {
+        var values = new List<long>();
+        if (long.TryParse(GetString(stream, "bit_rate"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var bitRate))
+        {
+            values.Add(bitRate);
+        }
+
+        if (tags.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var tag in tags.EnumerateObject())
+            {
+                if (IsBitRateTag(tag.Name)
+                    && long.TryParse(tag.Value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var fromTag))
+                {
+                    values.Add(fromTag);
+                }
+            }
+        }
+
+        return values.Count > 0 ? values.Max() : null;
+    }
+
+    private static bool IsBitRateTag(string name) =>
+        name.Contains("BPS", StringComparison.OrdinalIgnoreCase)
+        || name.Contains("BITRATE", StringComparison.OrdinalIgnoreCase)
+        || name.Contains("BIT_RATE", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A profundidade da amostra: bits_per_sample, bits_per_raw_sample ou o número do sample_fmt (s16, s24).</summary>
+    private static int? ParseBits(JsonElement stream)
+    {
+        var sample = GetInt(stream, "bits_per_sample");
+        if (sample is > 0)
+        {
+            return sample;
+        }
+
+        var raw = GetInt(stream, "bits_per_raw_sample");
+        if (raw is > 0)
+        {
+            return raw;
+        }
+
+        var sampleFormat = GetString(stream, "sample_fmt");
+        var match = sampleFormat is null ? Match.Empty : Regex.Match(sampleFormat, @"s(\d+)");
+        return match.Success
+            && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var bits)
+                ? bits
+                : null;
     }
 
     private static int? ParseId(string? id) =>

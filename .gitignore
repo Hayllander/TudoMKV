@@ -7,3 +7,9 @@ TestResults/
 publish/
 runtimes/ffmpeg/
 dist/
+
+# Rascunhos e arquivos de terceiros que ficam na pasta, mas não no repositório.
+src/TudoMKV.Languages/
+tmdbapi.json
+Nomear_Release-json.html
+correcao_que_fiz.txt

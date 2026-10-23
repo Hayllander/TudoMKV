@@ -24,7 +24,9 @@ public partial class App : Application
                 new FfmpegMuxer(mpeg2VlcCompatibility: () => AppSettingsStore.Load().Muxing.MarkMpeg2ForVlc),
                 new SelectionMuxJobBuilder(inspector),
                 new MetadataLookup(new OmdbMetadataService(), new TmdbMetadataService()),
-                new MkvTagWriter());
+                new MkvTagWriter(),
+                new ScreenshotGenerator(),
+                inspector);
             var window = new MainWindow { DataContext = viewModel };
 
             // Caminho passado na linha de comando (ex.: "Abrir com" no Explorer) já abre.

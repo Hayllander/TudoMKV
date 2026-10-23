@@ -70,20 +70,29 @@ public sealed class DvdReader(FfprobeInspector inspector) : IDiscReader
 internal static class DiscTracks
 {
     /// <summary>
-    /// Deixa as faixas de uma origem - disco ou arquivo - como o MakeMKV grava: padrões, nomes de áudio e
-    /// origem. O que a origem já nomeia ou marca fica como está; só o que falta é preenchido.
+    /// Deixa as faixas de uma origem - disco ou arquivo - prontas para a gravação: padrões, idioma em três
+    /// letras, nomes de áudio e legenda e origem. O nome das faixas de áudio e legenda é sempre reescrito no
+    /// padrão do ShawScope-Audio, mesmo que a origem já traga um; os outros tipos ficam como estão.
     /// </summary>
     public static void Prepare(IReadOnlyList<MediaTrack> tracks, SourceKind kind)
     {
         MarkDefaults(tracks);
         foreach (var track in tracks)
         {
-            if (track.Type == TrackType.Audio && string.IsNullOrEmpty(track.Title))
-            {
-                track.Title = AudioTitle(track.Channels);
-            }
+            // O idioma vai em três letras, como o contêiner o guarda: "pt" vira "por" e "en" vira "eng".
+            track.Language = TrackNaming.Language(track.Language);
 
-            track.SourceId = SourceId(kind, track.StreamId);
+            // No áudio o nome é "English AC3 5.1" e na legenda "Portuguese (Subtitles)", como o
+            // ShawScope-Audio grava.
+            track.Title = track.Type switch
+            {
+                TrackType.Audio => TrackNaming.AudioTitle(track),
+                TrackType.Subtitle => TrackNaming.SubtitleTitle(track.Language),
+                _ => track.Title,
+            };
+
+            // Arquivo não tem PID de disco: fica o SOURCE_ID que ele já traz (o de um MKV do MakeMKV).
+            track.SourceId = SourceId(kind, track.StreamId) ?? track.SourceId;
         }
     }
 
@@ -104,22 +113,9 @@ internal static class DiscTracks
         }
     }
 
-    /// <summary>Os mesmos nomes que o MakeMKV dá às faixas de áudio.</summary>
-    public static string? AudioTitle(int? channels) => channels switch
-    {
-        1 => "Mono",
-        2 => "Stereo",
-        6 => "Surround 5.1",
-        8 => "Surround 7.1",
-        _ => null,
-    };
-
-    /// <summary>Nome da faixa estéreo gerada, para não se confundir com uma faixa estéreo do próprio disco.</summary>
-    public const string StereoTitle = "Stereo 2.0";
-
     /// <summary>
     /// Acrescenta, logo depois de cada áudio mono, a faixa estéreo 2.0 que o TudoMKV gera na gravação
-    /// (o mono continua no MKV). O estéreo novo assume a marca de faixa padrão, como faria com o primeiro áudio.
+    /// (o mono continua no MKV). O estéreo novo herda a marca de faixa padrão do mono de onde sai.
     /// </summary>
     /// <param name="kind">Origem das faixas: o áudio sem perda do Blu-ray gera estéreo em FLAC.</param>
     public static IReadOnlyList<MediaTrack> WithMonoToStereo(IReadOnlyList<MediaTrack> tracks, SourceKind kind)
@@ -195,21 +191,27 @@ internal static class DiscTracks
 
     private static MediaTrack StereoAlternative(MediaTrack mono, AudioConversion conversion)
     {
+        // A marca de padrão passa do mono para o estéreo dele, e só dele: um segundo mono (comentário,
+        // outro idioma) não pode deixar o MKV com dois áudios padrão.
+        var isDefault = mono.IsDefault;
         mono.IsDefault = false;
-        return new MediaTrack
+        var stereo = new MediaTrack
         {
             InputIndex = mono.InputIndex,
             Index = mono.Index,
             Type = TrackType.Audio,
             Codec = conversion.Codec,
             Language = mono.Language,
-            Title = StereoTitle,
-            IsDefault = true,
+            IsDefault = isDefault,
             Channels = 2,
             SampleRate = mono.SampleRate,
             Conversion = conversion,
             ConvertedFrom = mono,
         };
+
+        // A faixa gerada nasce com o nome do script, o mesmo das outras faixas de áudio.
+        stereo.Title = TrackNaming.AudioTitle(stereo);
+        return stereo;
     }
 
     /// <summary>

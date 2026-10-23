@@ -98,6 +98,18 @@ public sealed class MediaTrack
 
     public int? SampleRate { get; init; }
 
+    /// <summary>
+    /// Bits por segundo do áudio: o que o ffprobe calcula ou o que as tags de estatística do arquivo
+    /// (BPS, BITRATE) trazem, valendo o maior. Serve ao resumo por faixa, como no ShawScope-Audio.
+    /// </summary>
+    public long? BitRate { get; init; }
+
+    /// <summary>Profundidade da amostra em bits, de bits_per_sample, bits_per_raw_sample ou do sample_fmt.</summary>
+    public int? BitsPerSample { get; init; }
+
+    /// <summary>Nome longo do codec ("DTS-HD Master Audio"), usado quando o codec não é conhecido.</summary>
+    public string? CodecLongName { get; init; }
+
     /// <summary>Como esta faixa é gerada na gravação a partir de <see cref="ConvertedFrom"/>; nula nas faixas copiadas.</summary>
     public AudioConversion? Conversion { get; init; }
 

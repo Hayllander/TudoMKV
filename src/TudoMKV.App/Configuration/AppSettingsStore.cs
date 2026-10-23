@@ -21,7 +21,7 @@ public static class AppSettingsStore
             }
 
             var json = File.ReadAllText(SettingsPath);
-            return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+            return Migrate(JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings());
         }
         catch
         {
@@ -29,8 +29,24 @@ public static class AppSettingsStore
         }
     }
 
+    /// <summary>
+    /// Antes do TMDb o padrão era "Nenhum", gravado por qualquer salvamento das Preferências; esse valor de um
+    /// arquivo antigo não foi uma escolha, então passa a ser o TMDb, como numa instalação nova.
+    /// </summary>
+    public static AppSettings Migrate(AppSettings settings)
+    {
+        if (settings.SchemaVersion < 2 && settings.Integration.Provider == MetadataProvider.None)
+        {
+            settings.Integration.Provider = MetadataProvider.Tmdb;
+        }
+
+        settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+        return settings;
+    }
+
     public static void Save(AppSettings settings)
     {
+        settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
         Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
         var json = JsonSerializer.Serialize(settings, JsonOptions);
         File.WriteAllText(SettingsPath, json);

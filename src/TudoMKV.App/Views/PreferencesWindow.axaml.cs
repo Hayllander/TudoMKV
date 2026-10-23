@@ -23,6 +23,7 @@ public partial class PreferencesWindow : Window
         ApiDataBox.Text = settings.Integration.ApiData;
         Mpeg2CompatBox.IsChecked = settings.Muxing.MarkMpeg2ForVlc;
         ReleaseGroupBox.Text = settings.Muxing.ReleaseGroup;
+        ScreenshotsBox.IsChecked = settings.Muxing.GenerateScreenshots;
     }
 
     private AppSettings CurrentSettings() => new()
@@ -37,6 +38,7 @@ public partial class PreferencesWindow : Window
         {
             MarkMpeg2ForVlc = Mpeg2CompatBox.IsChecked ?? true,
             ReleaseGroup = ReleaseGroupBox.Text?.Trim() ?? string.Empty,
+            GenerateScreenshots = ScreenshotsBox.IsChecked ?? false,
         },
     };
 

@@ -34,6 +34,18 @@ public class ReleaseNameTests
     }
 
     [Fact]
+    public void DropsWhatCannotGoInAFileNameFromTheGroup()
+    {
+        var name = ReleaseName.Build(
+            Movie,
+            Source(Video("mpeg2video", 720, 480), Audio(1, "ac3", 2)),
+            SourceKind.Dvd,
+            " H/A:Y ");
+
+        Assert.Equal("Bastard.Swordsman.1983.DVD.REMUX.DD2.0.MPEG2-HAY", name);
+    }
+
+    [Fact]
     public void NamesABlurayLikeTheExampleOfTheStandard()
     {
         var movie = new MovieInfo { Title = "Painted Skin", Year = "2008" };

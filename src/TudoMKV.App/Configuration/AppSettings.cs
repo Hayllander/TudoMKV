@@ -2,6 +2,15 @@ namespace TudoMKV.App.Configuration;
 
 public sealed class AppSettings
 {
+    /// <summary>Formato atual do settings.json; o 2 é o primeiro com o TMDb.</summary>
+    public const int CurrentSchemaVersion = 2;
+
+    /// <summary>
+    /// Formato em que o arquivo foi gravado. Um settings.json antigo não traz o campo e fica com 0, o que permite
+    /// migrar o que mudou de significado entre as versões.
+    /// </summary>
+    public int SchemaVersion { get; set; }
+
     public IntegrationSettings Integration { get; set; } = new();
 
     public MuxingSettings Muxing { get; set; } = new();
@@ -20,6 +29,11 @@ public sealed class MuxingSettings
     /// <c>Painted.Skin.2008.1080p.BluRay.REMUX.AVC.DTS-HD.MA7.1-HAY</c>).
     /// </summary>
     public string ReleaseGroup { get; set; } = "HAY";
+
+    /// <summary>
+    /// Gera 15 capturas de tela em PNG ao lado de cada MKV gravado, como o ScreenShot.cmd. Desligada por padrão.
+    /// </summary>
+    public bool GenerateScreenshots { get; set; }
 }
 
 public sealed class IntegrationSettings

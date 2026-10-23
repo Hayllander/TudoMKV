@@ -18,6 +18,7 @@ public sealed record MetadataReference(MetadataSource Source, string Id)
     private static readonly Regex ImdbIdRegex = new(@"tt\d{7,9}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex TmdbMovieRegex = new(@"/movie/(\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex TmdbNumberRegex = new(@"^\d+$", RegexOptions.CultureInvariant);
+    private static readonly Regex BareImdbNumberRegex = new(@"^0\d{6,8}$", RegexOptions.CultureInvariant);
 
     /// <summary>
     /// Aceita o código do IMDb (tt1234567), o link do IMDb, o número do TMDb ou o link do TMDb — inclusive
@@ -40,6 +41,13 @@ public sealed record MetadataReference(MetadataSource Source, string Id)
         if (TmdbMovieRegex.Match(text) is { Success: true } movie)
         {
             return new MetadataReference(MetadataSource.Tmdb, movie.Groups[1].Value);
+        }
+
+        // O IMDb completa o código com zeros à esquerda (0111161) e o TMDb nunca começa por zero: um número assim
+        // é o código do IMDb digitado sem o "tt".
+        if (BareImdbNumberRegex.IsMatch(text))
+        {
+            return new MetadataReference(MetadataSource.Imdb, "tt" + text);
         }
 
         return TmdbNumberRegex.IsMatch(text) ? new MetadataReference(MetadataSource.Tmdb, text) : null;

@@ -47,7 +47,8 @@ public static class ReleaseName
         }
 
         var name = string.Join('.', parts.Where(part => part.Length > 0));
-        return group.Length > 0 ? $"{name}-{group}" : name;
+        var signature = FileSafe(group);
+        return signature.Length > 0 ? $"{name}-{signature}" : name;
     }
 
     /// <summary>
@@ -150,6 +151,13 @@ public static class ReleaseName
         }
 
         return builder.ToString().Trim('.');
+    }
+
+    /// <summary>O grupo vem das Preferências e vai para o nome do arquivo: sem espaço nem caractere inválido.</summary>
+    private static string FileSafe(string group)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        return new string(group.Where(character => !invalid.Contains(character) && !char.IsWhiteSpace(character)).ToArray());
     }
 
     private static void Add(List<string> parts, string? part)

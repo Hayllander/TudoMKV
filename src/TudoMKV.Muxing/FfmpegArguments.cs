@@ -129,7 +129,7 @@ public static class FfmpegArguments
                 continue;
             }
 
-            args.AddRange([$"-metadata:s:{output}", $"language={NormalizeLanguage(track.Language)}"]);
+            args.AddRange([$"-metadata:s:{output}", $"language={TrackNaming.Language(track.Language)}"]);
             args.AddRange([$"-metadata:s:{output}", $"title={track.Title ?? string.Empty}"]);
             args.AddRange([$"-disposition:{output}", Disposition(track)]);
 
@@ -166,7 +166,4 @@ public static class FfmpegArguments
         (false, true) => "forced",
         _ => "0",
     };
-
-    private static string NormalizeLanguage(string language) =>
-        string.IsNullOrWhiteSpace(language) ? "und" : language.Trim().ToLowerInvariant();
 }

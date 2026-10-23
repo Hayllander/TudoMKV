@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="TudoMKV.App.Views.PreferencesWindow"
         Title="Preferências do TudoMKV"
-        Width="560" Height="400"
-        MinWidth="520" MinHeight="360"
+        Width="560" Height="500"
+        MinWidth="520" MinHeight="460"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
 
@@ -43,7 +43,7 @@
 
       <TabItem Header="Muxing">
         <Border Padding="14">
-          <Grid RowDefinitions="Auto,12,Auto,10,Auto,12,Auto,10,Auto,*">
+          <Grid RowDefinitions="Auto,12,Auto,10,Auto,12,Auto,10,Auto,16,Auto,10,Auto,*">
             <TextBlock Text="Ajustes aplicados na hora de gravar o MKV." TextWrapping="Wrap" />
 
             <CheckBox x:Name="Mpeg2CompatBox" Grid.Row="2"
@@ -61,6 +61,13 @@
 
             <TextBlock Grid.Row="8"
                        Text="Assinatura no fim do nome do MKV, como nas releases de cena (o &quot;-HAY&quot; de Painted.Skin.2008.1080p.BluRay.REMUX.AVC.DTS-HD.MA7.1-HAY). Vale quando o filme é identificado no TMDb ou no IMDb e há um único título marcado; deixe em branco para gravar sem assinatura."
+                       TextWrapping="Wrap"
+                       Opacity="0.7" />
+
+            <CheckBox x:Name="ScreenshotsBox" Grid.Row="10" Content="ScreenShots" />
+
+            <TextBlock Grid.Row="12"
+                       Text="Ao terminar cada MKV, gera 15 capturas em PNG entre 5% e 95% do filme, na mesma pasta (Nome_screenshot_001.png...). A imagem sai no tamanho de exibição: um DVD 16:9 de 720x480 vira 853x480."
                        TextWrapping="Wrap"
                        Opacity="0.7" />
           </Grid>

@@ -3,9 +3,9 @@ using TudoMKV.App.Configuration;
 namespace TudoMKV.App.Integration;
 
 /// <summary>
-/// Busca a ficha do filme a partir do que foi digitado na tela: o código do IMDb vai ao OMDb; o número do filme
-/// ou o link do TMDb vai ao TMDb. O TMDb é a fonte principal e o OMDb cobre o que ele deixar faltando — a nota
-/// do IMDb, por exemplo — usando o código IMDb que o próprio TMDb devolve.
+/// Busca a ficha do filme a partir do que foi digitado na tela: o número do filme ou o link do TMDb vai ao TMDb;
+/// o código do IMDb vai ao OMDb, ou ao TMDb quando não há chave do OMDb. O TMDb é a fonte principal e o OMDb
+/// cobre o que ele deixar faltando — a nota do IMDb, por exemplo — usando o código IMDb que o TMDb devolve.
 /// </summary>
 public sealed class MetadataLookup(OmdbMetadataService omdb, TmdbMetadataService tmdb)
 {
@@ -20,8 +20,24 @@ public sealed class MetadataLookup(OmdbMetadataService omdb, TmdbMetadataService
             ?? throw new InvalidOperationException("Informe um código do IMDb (tt1234567), o número do filme no TMDb ou um link do IMDb/TMDb.");
 
         return parsed.Source == MetadataSource.Imdb
-            ? await omdb.FetchAsync(parsed.Id, cancellationToken)
+            ? await FetchFromImdbIdAsync(parsed.Id, cancellationToken)
             : await FetchFromTmdbAsync(parsed.Id, cancellationToken);
+    }
+
+    /// <summary>
+    /// O código do IMDb vai ao OMDb quando há chave dele, como antes. Sem ela - o padrão, já que a chave do OMDb
+    /// não vem preenchida - o /find do TMDb traduz o código para o número do filme lá.
+    /// </summary>
+    private async Task<MovieInfo> FetchFromImdbIdAsync(string imdbId, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(AppSettingsStore.Load().Integration.ApiData))
+        {
+            return await omdb.FetchAsync(imdbId, cancellationToken);
+        }
+
+        var tmdbId = await tmdb.FindByImdbIdAsync(imdbId, cancellationToken)
+            ?? throw new InvalidOperationException($"O TMDb não encontrou um filme com o código {imdbId}.");
+        return await FetchFromTmdbAsync(tmdbId, cancellationToken);
     }
 
     private async Task<MovieInfo> FetchFromTmdbAsync(string tmdbId, CancellationToken cancellationToken)

@@ -70,6 +70,7 @@ public class FfmpegArgumentsTests
         var mono = Track(1, TrackType.Audio, "ac3", channels: 1);
         mono.Language = "por";
         mono.Title = "Mono";
+        mono.IsDefault = true;
         var tracks = DiscTracks.WithMonoToStereo([Track(0, TrackType.Video, "mpeg2video"), mono], SourceKind.Dvd);
 
         var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
@@ -79,7 +80,7 @@ public class FfmpegArgumentsTests
         Assert.Contains("-c copy", text);
         Assert.Contains("-c:2 ac3 -b:2 192k", text);
         Assert.Contains("-metadata:s:2 language=por", text);
-        Assert.Contains("-metadata:s:2 title=Stereo 2.0", text);
+        Assert.Contains("-metadata:s:2 title=Portuguese AC3 2.0", text);
         Assert.Contains("-disposition:2 default", text);
         Assert.Contains("-disposition:1 0", text);
         Assert.Contains("-metadata:s:1 title=Mono", text);
@@ -108,6 +109,7 @@ public class FfmpegArgumentsTests
     {
         var video = Track(0, TrackType.Video, "mpeg2video");
         var mono = Track(1, TrackType.Audio, "ac3", channels: 1);
+        mono.IsDefault = true;
         var tracks = DiscTracks.WithMonoToStereo([video, mono], SourceKind.Dvd);
 
         Assert.Equal([video, mono, tracks[2]], tracks);
@@ -124,9 +126,33 @@ public class FfmpegArgumentsTests
     }
 
     [Fact]
+    public void OnlyTheStereoOfTheDefaultMonoBecomesTheDefaultTrack()
+    {
+        var main = Track(1, TrackType.Audio, "ac3", channels: 1);
+        main.IsDefault = true;
+        var commentary = Track(2, TrackType.Audio, "ac3", channels: 1);
+
+        var tracks = DiscTracks.WithMonoToStereo([Track(0, TrackType.Video, "mpeg2video"), main, commentary], SourceKind.Dvd);
+
+        Assert.Equal([false, true, false, false], tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.IsDefault));
+    }
+
+    [Fact]
+    public void KeepsTheSourceIdTheFileAlreadyBrings()
+    {
+        var audio = Track(1, TrackType.Audio, "ac3", channels: 6);
+        audio.SourceId = "0180BD";
+
+        DiscTracks.Prepare([Track(0, TrackType.Video, "mpeg2video"), audio], SourceKind.Files);
+
+        Assert.Equal("0180BD", audio.SourceId);
+    }
+
+    [Fact]
     public void EncodesLosslessMonoOfABlurayAsFlacWithoutBitrate()
     {
         var mono = Track(1, TrackType.Audio, "pcm_bluray", channels: 1);
+        mono.IsDefault = true;
         var tracks = new List<MediaTrack> { Track(0, TrackType.Video, "h264"), mono };
         DiscTracks.EncodePcm(tracks, SourceKind.Bluray);
 
@@ -141,7 +167,7 @@ public class FfmpegArgumentsTests
         Assert.Contains("-c:1 flac", text);
         Assert.Contains("-filter_complex [0:1]pan=stereo|c0=c0|c1=c0[conv2]", text);
         Assert.Contains("-c:2 flac", text);
-        Assert.Contains("-metadata:s:2 title=Stereo 2.0", text);
+        Assert.Contains("-metadata:s:2 title=Unknown FLAC 2.0", text);
         Assert.Contains("-disposition:2 default", text);
         Assert.DoesNotContain("-b:2", text);
     }
@@ -247,7 +273,7 @@ public class FfmpegArgumentsTests
 
         var text = ArgsText(MuxJob.FromSelection(Source([.. tracks])));
 
-        Assert.Equal(["Surround 7.1", "Surround 7.1"], tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Title));
+        Assert.Equal(["Unknown DTS 7.1", "Unknown PCM 7.1"], tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Title));
         Assert.Contains("-disposition:0 default", text);
         Assert.Contains("-disposition:1 default", text);
         Assert.Contains("-disposition:2 0", text);
@@ -256,7 +282,7 @@ public class FfmpegArgumentsTests
     }
 
     [Fact]
-    public void KeepsTheNamesAndDefaultsTheFileAlreadyBrings()
+    public void ReplacesTheNameOfTheFileAndKeepsItsDefault()
     {
         var video = Track(0, TrackType.Video, "h264");
         var audio = Track(1, TrackType.Audio, "dts", channels: 8);
@@ -265,7 +291,7 @@ public class FfmpegArgumentsTests
 
         DiscTracks.Prepare([video, audio], SourceKind.Files);
 
-        Assert.Equal("DTS-HD MA 7.1", audio.Title);
+        Assert.Equal("Unknown DTS 7.1", audio.Title);
         Assert.False(video.IsDefault);
     }
 

@@ -16,16 +16,35 @@ public sealed class TmdbMetadataService
 
     private static readonly HttpClient Http = new();
 
-    public async Task<MovieInfo> FetchAsync(string tmdbId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Número do filme no TMDb a partir do código do IMDb, pelo /find. Nulo quando o TMDb não conhece o código
+    /// ou o código é de uma série, e não de um filme.
+    /// </summary>
+    public async Task<string?> FindByImdbIdAsync(string imdbId, CancellationToken cancellationToken = default)
     {
-        var apiKey = AppSettingsStore.Load().Integration.TmdbApiKey;
-        if (string.IsNullOrWhiteSpace(apiKey))
+        var url = $"https://api.themoviedb.org/3/find/{Uri.EscapeDataString(imdbId)}" +
+                  $"?api_key={Uri.EscapeDataString(ApiKey())}&external_source=imdb_id";
+        using var response = await Http.GetAsync(url, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (!json.RootElement.TryGetProperty("movie_results", out var movies) || movies.ValueKind != JsonValueKind.Array)
         {
-            throw new InvalidOperationException("Informe a chave da API TMDb nas Preferências, na aba Integration.");
+            return null;
         }
 
+        return movies.EnumerateArray()
+            .Select(movie => movie.TryGetProperty("id", out var id) && id.TryGetInt32(out var number) ? number : 0)
+            .Where(number => number > 0)
+            .Select(number => number.ToString(CultureInfo.InvariantCulture))
+            .FirstOrDefault();
+    }
+
+    public async Task<MovieInfo> FetchAsync(string tmdbId, CancellationToken cancellationToken = default)
+    {
         var url = $"https://api.themoviedb.org/3/movie/{Uri.EscapeDataString(tmdbId)}" +
-                  $"?api_key={Uri.EscapeDataString(apiKey)}&language={Language}&append_to_response=credits";
+                  $"?api_key={Uri.EscapeDataString(ApiKey())}&language={Language}&append_to_response=credits";
         using var response = await Http.GetAsync(url, cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -61,6 +80,14 @@ public sealed class TmdbMetadataService
             PosterUrl = Poster(root),
             Plot = Clean(GetString(root, "overview")),
         };
+    }
+
+    private static string ApiKey()
+    {
+        var apiKey = AppSettingsStore.Load().Integration.TmdbApiKey;
+        return string.IsNullOrWhiteSpace(apiKey)
+            ? throw new InvalidOperationException("Informe a chave da API TMDb nas Preferências, na aba Integration.")
+            : apiKey;
     }
 
     private static string Director(JsonElement root)

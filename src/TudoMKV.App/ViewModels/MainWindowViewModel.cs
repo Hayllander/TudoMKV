@@ -22,17 +22,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly SelectionMuxJobBuilder _jobBuilder;
     private readonly MetadataLookup _metadataLookup;
     private readonly MkvTagWriter _mkvTagWriter;
+    private readonly ScreenshotGenerator _screenshots;
+    private readonly FfprobeInspector _inspector;
     private readonly List<(MediaSource Source, TreeNodeViewModel Title, TreeNodeViewModel? Chapters)> _titles = [];
     private CancellationTokenSource? _cancellation;
+
+    /// <summary>Versão em uso e aviso de atualização: voltam ao topo do log quando outro disco o esvazia.</summary>
+    private readonly List<string> _startupLines = [];
     private SourceKind _kind = SourceKind.Files;
 
-    public MainWindowViewModel(SourceOpener opener, IMuxer muxer, SelectionMuxJobBuilder jobBuilder, MetadataLookup metadataLookup, MkvTagWriter mkvTagWriter)
+    public MainWindowViewModel(SourceOpener opener, IMuxer muxer, SelectionMuxJobBuilder jobBuilder, MetadataLookup metadataLookup, MkvTagWriter mkvTagWriter, ScreenshotGenerator screenshots, FfprobeInspector inspector)
     {
         _opener = opener;
         _muxer = muxer;
         _jobBuilder = jobBuilder;
         _metadataLookup = metadataLookup;
         _mkvTagWriter = mkvTagWriter;
+        _screenshots = screenshots;
+        _inspector = inspector;
         Log.CollectionChanged += (_, _) => OnPropertyChanged(nameof(LogText));
     }
 
@@ -95,12 +102,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public async Task StartupAsync()
     {
-        AddLog(UpdateChecker.StartupLine());
+        _startupLines.Add(UpdateChecker.StartupLine());
+        AddLog(_startupLines[0]);
         if (await UpdateChecker.NewerVersionLineAsync() is { } newer)
         {
+            _startupLines.Add(newer);
             AddLog(newer);
         }
     }
+
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(MakeMkvCommand))]
@@ -138,8 +148,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // A origem anterior sai da tela; libera as ISOs que montamos para ela.
         IsoMount.ReleaseAll();
 
-        // Outro disco começa do zero: a console fica só com o que este disco disser.
+        // Outro disco começa do zero: a console fica com a versão em uso e o que este disco disser.
         ClearLog();
+        _startupLines.ForEach(AddLog);
 
         try
         {
@@ -383,6 +394,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     await TryApplyTagsAsync(job.OutputPath, _cancellation.Token);
                     done++;
                     AddLog($"Título gravado: {Path.GetFileName(job.OutputPath)}");
+                    await TryGenerateScreenshotsAsync(job.OutputPath, _cancellation.Token);
+                    await TryLogTrackInfoAsync(job.OutputPath, _cancellation.Token);
                 }
                 finally
                 {
@@ -490,6 +503,50 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 AddLog(log);
             }
+        }
+    }
+
+    /// <summary>
+    /// Com a opção ScreenShots ligada nas Preferências, gera as capturas do MKV recém-gravado. Falhar nelas não
+    /// invalida a gravação: o MKV já está pronto.
+    /// </summary>
+    private async Task TryGenerateScreenshotsAsync(string outputPath, CancellationToken cancellationToken)
+    {
+        if (!AppSettingsStore.Load().Muxing.GenerateScreenshots)
+        {
+            return;
+        }
+
+        StatusText = $"Gerando screenshots: {Path.GetFileName(outputPath)}";
+        try
+        {
+            var created = await _screenshots.GenerateAsync(outputPath, AddLog, cancellationToken);
+            AddLog($"Screenshots gerados: {created} de {ScreenshotGenerator.Count}");
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or IOException or MuxException or UnauthorizedAccessException)
+        {
+            AddLog($"Não foi possível gerar os screenshots: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Escreve no log o resumo de cada faixa de áudio do MKV recém-gravado, no formato do ShawScope-Audio:
+    /// "Track 1: English / DTS-HD Master Audio / 5.1 / 48.0 kHz / 2178 kb/s / 16-bit / \"English DTS-HD MA 5.1\"".
+    /// Lê o arquivo já escrito (e não o modelo em memória), como o script faz. Falhar aqui não invalida a gravação.
+    /// </summary>
+    private async Task TryLogTrackInfoAsync(string outputPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var source = await _inspector.InspectAsync(outputPath, cancellationToken);
+            foreach (var line in TrackNaming.Report(source))
+            {
+                AddLog(line);
+            }
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or IOException or MuxException or UnauthorizedAccessException)
+        {
+            AddLog($"Aviso: não foi possível ler as informações de áudio: {ex.Message}");
         }
     }
 

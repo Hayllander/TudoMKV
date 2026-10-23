@@ -106,7 +106,7 @@ public sealed class BlurayTests(TestBluray bd) : IClassFixture<TestBluray>, IDis
             [("h264", "und"), ("ac3", "por"), ("ac3", "eng"), ("hdmv_pgs_subtitle", "por")],
             result.Tracks.Select(t => (t.Codec, t.Language)));
         Assert.Equal(["001011", "001100", "001101", "001200"], result.Tracks.Select(t => t.SourceId));
-        Assert.Equal(["Stereo", "Stereo"], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Title));
+        Assert.Equal(["Portuguese AC3 2.0", "English AC3 2.0"], result.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Title));
         Assert.Equal(1.0, reports.Last());
     }
 
